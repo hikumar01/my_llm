@@ -1,0 +1,52 @@
+# Ignore model cache directory (mounted as volume)
+.llm_models/
+
+# Ignore host data directory (mounted as volume)
+.host_data/
+
+# Python cache
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+*.egg-info/
+dist/
+build/
+
+# Virtual environments
+venv/
+env/
+ENV/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# Git
+.git/
+.gitignore
+
+# Documentation (not needed in container)
+*.md
+!README.md
+
+# Setup scripts (run on host, not in container)
+setup_models.sh
+
+# Test files
+test_*.sh
+
+# Logs
+*.log
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Temporary files
+*.tmp
+*.bak

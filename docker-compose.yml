@@ -1,0 +1,82 @@
+networks:
+  llm_network:
+    name: llm_assistant_network
+  default:
+    name: llm_assistant_network
+
+volumes:
+  assistant_data:
+    name: llm_assistant_data
+
+services:
+  ollama:
+    image: ollama/ollama:latest
+    container_name: ollama
+    ports:
+      - "11434:11434"
+    volumes:
+      - ./.llm_models:/root/.ollama:rw
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "ollama list || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+
+  assistant:
+    container_name: assistant
+
+    build:
+      context: .              # Build context: project root directory
+      dockerfile: Dockerfile  # Dockerfile location
+
+    # Volume mounts:
+    # 1. C++ source code repositories (read-only)
+    #    - Host: ${HOST_REPOS_DIR} from .env (default: ~/src)
+    #    - Container: /repos
+    #    - Purpose: Access C++ codebases for analysis
+    #
+    # 2. Persistent data directory (read-write)
+    #    - Host: ./.host_data (project root)
+    #    - Container: /app/host_data
+    #    - Contains: symbol_db.sqlite, faiss_index/, comparisons/, logs
+    #    - Purpose: Persist database, indices, and results
+    #
+    # 3. Source code (read-write, for development)
+    #    - Host: ./src (project root)
+    #    - Container: /app/src
+    #    - Purpose: Live code updates without rebuilding container
+    #    - Note: Remove this mount in production for immutability
+
+    volumes:
+      - ${HOST_REPOS_DIR:-~/src}:/repos:ro
+      - assistant_data:/app/host_data
+      - ./src:/app/src:rw
+      - ./frontend:/app/frontend:rw
+    ports:
+      - "8080:8080"
+
+    # Environment variables:
+    # - OLLAMA_URL: Ollama API endpoint (uses Docker service name)
+    # - All other settings have defaults in src/constants.py
+    # - Uncomment performance settings below to override defaults
+    environment:
+      # Required: Ollama API URL (Docker service name resolves to container IP)
+      - OLLAMA_URL=http://ollama:11434
+
+      # Optional: Performance tuning (uncomment to override defaults)
+      # - SYMBOL_BATCH_SIZE=100           # Symbols per database batch
+      # - EMBEDDING_BATCH_SIZE=32         # Symbols per embedding batch
+      # - SYMBOL_EXTRACTOR_WORKERS=4      # Parallel extraction workers
+      # - WATCH_DEBOUNCE_SECONDS=2.0      # File change debounce delay
+      # - LOG_LEVEL=DEBUG                 # Logging verbosity
+
+    # Service dependencies:
+    # - Wait for Ollama service to start before starting assistant
+    # - Note: Does not wait for health check, only for container start
+    depends_on:
+      - ollama
+
+    # Restart policy: Always restart unless explicitly stopped
+    restart: unless-stopped

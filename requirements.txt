@@ -1,0 +1,17 @@
+# Core dependencies for code generation
+requests  # For Ollama API calls
+libclang  # C++ parsing and symbol extraction
+
+# Vector search and embeddings
+torch>=2.0.0  # PyTorch for deep learning
+sentence-transformers  # Semantic code search
+faiss-cpu  # Vector similarity search
+
+# File watching and database
+watchdog  # File system monitoring
+sqlite-utils  # SQLite database utilities
+
+# REST API server
+fastapi  # Modern web framework for building APIs
+uvicorn[standard]  # ASGI server for FastAPI
+pydantic  # Data validation and settings management
