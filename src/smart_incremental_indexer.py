@@ -91,13 +91,13 @@ def get_file_mtime(filepath: str) -> Optional[float]:
 
 def get_all_cpp_files(repo_path: str) -> List[str]:
     """
-    Get all C++ files in a repository.
+    Get all code files in a repository.
     
     Args:
         repo_path: Path to the repository
     
     Returns:
-        List[str]: List of C++ file paths
+        List[str]: List of code file paths
     """
     repo_path_obj = Path(repo_path)
     cpp_files = []
@@ -162,7 +162,7 @@ def get_files_to_index(repo_path: str, repo_name: str, current_commit: Optional[
 
 def smart_index_repo(repo_path: str, force_full: bool = False, parallel: bool = True, rebuild_vectors: bool = True) -> bool:
     """
-    Smart incremental indexing of a C++ repository.
+    Smart incremental indexing of a code repository.
     
     This function intelligently determines which files need to be re-indexed based on:
     1. Git commit hash (if repository is a git repo)
@@ -210,7 +210,7 @@ def smart_index_repo(repo_path: str, force_full: bool = False, parallel: bool = 
         deleted_metadata = delete_file_metadata(repo_name)
         print(f"Cleared {deleted_symbols} symbols and {deleted_metadata} metadata records")
         
-        # Get all C++ files
+        # Get all code files
         files_to_index = get_all_cpp_files(repo_path)
     else:
         print("\nAnalyzing repository for changes...")

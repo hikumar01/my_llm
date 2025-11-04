@@ -1,9 +1,6 @@
 # Ignore model cache directory (mounted as volume)
 .llm_models/
 
-# Ignore host data directory (mounted as volume)
-.host_data/
-
 # Byte-compiled / optimized / DLL files
 __pycache__/
 *.py[codz]

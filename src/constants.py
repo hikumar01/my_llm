@@ -1,14 +1,14 @@
 #!/usr/bin/env python3
 """
-Centralized Configuration Constants for C++ AI Assistant
-========================================================
+Centralized Configuration Constants for AI Code Assistant
+==========================================================
 
 This module contains ALL configuration constants used throughout the application.
 It provides a single source of truth for all settings, with sensible defaults
 and environment variable overrides.
 
 Usage:
-    from constants import OLLAMA_URL, SYMBOL_BATCH_SIZE, CPP_EXTENSIONS
+    from constants import OLLAMA_URL, SYMBOL_BATCH_SIZE, CODE_EXTENSIONS
 
 Environment Variables:
     All constants can be overridden via environment variables.
@@ -23,17 +23,17 @@ from typing import Set
 # DIRECTORY PATHS
 # ============================================================================
 
-# CONTAINER_REPOS_DIR: Directory where C++ source code repositories are mounted
+# CONTAINER_REPOS_DIR: Directory where source code repositories are mounted
 # Default: /repos (read-only mount from host)
 # Override: Set CONTAINER_REPOS_DIR environment variable
 # Example: CONTAINER_REPOS_DIR=/custom/repos
 CONTAINER_REPOS_DIR = os.getenv("CONTAINER_REPOS_DIR", "/repos")
 
-# CONTAINER_HOST_DATA_DIR: Directory for persistent data (database, indices, logs)
-# Default: /app/host_data (mounted from host .host_data directory)
-# Override: Set CONTAINER_HOST_DATA_DIR environment variable
-# Contains: symbol_db.sqlite, faiss_index/, comparisons/, assistant.log
-CONTAINER_HOST_DATA_DIR = os.getenv("CONTAINER_HOST_DATA_DIR", "/app/host_data")
+# CONTAINER_DATA_DIR: Directory for persistent data (database, indices, logs)
+# Default: /app/data (Docker named volume: assistant_data)
+# Override: Set CONTAINER_DATA_DIR environment variable
+# Contains: symbol_db.sqlite, faiss_index/, assistant.log
+CONTAINER_DATA_DIR = os.getenv("CONTAINER_DATA_DIR", "/app/data")
 
 # CONTAINER_SRC_DIR: Directory containing Python source code
 # Default: /app/src (copied during Docker build)
@@ -41,39 +41,37 @@ CONTAINER_HOST_DATA_DIR = os.getenv("CONTAINER_HOST_DATA_DIR", "/app/host_data")
 # Note: Usually not changed unless using volume mount for development
 CONTAINER_SRC_DIR = os.getenv("CONTAINER_SRC_DIR", "/app/src")
 
-# COMPARISONS_DIR: Directory for storing model comparison results
-# Default: /app/host_data/comparisons
-# Override: Set COMPARISONS_DIR environment variable
-# Structure: comparisons/<timestamp>/<model_name>/
-COMPARISONS_DIR = os.getenv("COMPARISONS_DIR", "/app/host_data/comparisons")
-
 # FAISS_INDEX_DIR: Directory for FAISS vector index files
-# Default: /app/host_data/faiss_index
+# Default: /app/data/faiss_index
 # Override: Set FAISS_INDEX_DIR environment variable
 # Contains: index.faiss (vector index), meta.npy (metadata)
-FAISS_INDEX_DIR = os.getenv("FAISS_INDEX_DIR", "/app/host_data/faiss_index")
+FAISS_INDEX_DIR = os.getenv("FAISS_INDEX_DIR", f"{CONTAINER_DATA_DIR}/faiss_index")
 
-# SYMBOL_DB_PATH: Path to SQLite database storing extracted C++ symbols
-# Default: /app/host_data/symbol_db.sqlite
+# SYMBOL_DB_PATH: Path to SQLite database storing extracted code symbols
+# Default: /app/data/symbol_db.sqlite
 # Override: Set SYMBOL_DB_PATH environment variable
 # Schema: symbols(id, repo, file, symbol, kind, signature, doc, line, created_at)
-SYMBOL_DB_PATH = os.getenv("SYMBOL_DB_PATH", "/app/host_data/symbol_db.sqlite")
+SYMBOL_DB_PATH = os.getenv("SYMBOL_DB_PATH", f"{CONTAINER_DATA_DIR}/symbol_db.sqlite")
 
 
 # ============================================================================
 # FILE EXTENSIONS
 # ============================================================================
 
-# CPP_EXTENSIONS: Set of C++ file extensions to process during symbol extraction
-# Default: All common C++ source and header file extensions
+# CODE_EXTENSIONS: Set of code file extensions to process during symbol extraction
+# Default: Common C/C++ source and header file extensions
 # Note: This is a Python set for O(1) lookup performance
 # Used by: symbol_extractor.py, git_incremental_indexer.py
-CPP_EXTENSIONS: Set[str] = {'.cpp', '.cc', '.c', '.cxx', '.hpp', '.h', '.hxx', '.hh'}
+# Can be extended to support other languages (Python, Java, etc.)
+CODE_EXTENSIONS: Set[str] = {'.cpp', '.cc', '.c', '.cxx', '.hpp', '.h', '.hxx', '.hh'}
+
+# Legacy alias for backward compatibility
+CPP_EXTENSIONS = CODE_EXTENSIONS
 
 # WATCH_EXTENSIONS: File extensions to monitor for changes in file watcher
-# Default: Common C++ source and header extensions (comma-separated)
+# Default: Common source and header extensions (comma-separated)
 # Override: Set WATCH_EXTENSIONS environment variable
-# Example: WATCH_EXTENSIONS=".cpp,.hpp,.h"
+# Example: WATCH_EXTENSIONS=".cpp,.hpp,.h,.py,.java"
 # Used by: fs_watcher.py for real-time file monitoring
 WATCH_EXTENSIONS: Set[str] = set(
     os.getenv("WATCH_EXTENSIONS", ".cpp,.cc,.c,.hpp,.h,.cxx,.hxx").split(',')
@@ -198,13 +196,13 @@ DEFAULT_TEMPERATURE = float(os.getenv("DEFAULT_TEMPERATURE", "0.2"))
 DEFAULT_TOP_P = float(os.getenv("DEFAULT_TOP_P", "0.9"))
 
 # SYSTEM_PROMPT: System instruction for LLM code generation
-# Default: Expert C++ programmer with C++17 focus
+# Default: Expert programmer with modern best practices
 # Override: Set SYSTEM_PROMPT environment variable
-# Example: "You are a C++20 expert focusing on modern features"
+# Example: "You are a Python expert focusing on clean code"
 # Used by: llm_client.py to set LLM behavior
 SYSTEM_PROMPT = os.getenv(
     "SYSTEM_PROMPT",
-    "You are an expert C++ programmer. Generate clean, efficient, well-documented C++17 code."
+    "You are an expert programmer. Generate clean, efficient, well-documented code following modern best practices."
 )
 
 
@@ -213,7 +211,7 @@ SYSTEM_PROMPT = os.getenv(
 # ============================================================================
 
 # CLANG_FORMAT_STYLE: Code formatting style for clang-format
-# Default: Google (Google C++ Style Guide)
+# Default: Google (Google Style Guide)
 # Override: Set CLANG_FORMAT_STYLE environment variable
 # Alternatives: LLVM, Chromium, Mozilla, WebKit, Microsoft, GNU
 # Example: CLANG_FORMAT_STYLE=LLVM
@@ -255,11 +253,11 @@ LOG_FORMAT = os.getenv(
 )
 
 # LOG_FILE: Path to application log file
-# Default: /app/host_data/assistant.log
+# Default: /app/data/assistant.log
 # Override: Set LOG_FILE environment variable
-# Note: Persisted to host via volume mount
+# Note: Persisted via Docker named volume
 # Used by: Logging configuration for file output
-LOG_FILE = os.getenv("LOG_FILE", "/app/host_data/assistant.log")
+LOG_FILE = os.getenv("LOG_FILE", f"{CONTAINER_DATA_DIR}/assistant.log")
 
 
 # ============================================================================
@@ -379,7 +377,7 @@ def get_faiss_index_path() -> str:
 
     Example:
         >>> get_faiss_index_path()
-        '/app/host_data/faiss_index/index.faiss'
+        '/app/data/faiss_index/index.faiss'
     """
     return os.path.join(FAISS_INDEX_DIR, "index.faiss")
 
@@ -396,7 +394,7 @@ def get_faiss_meta_path() -> str:
 
     Example:
         >>> get_faiss_meta_path()
-        '/app/host_data/faiss_index/meta.npy'
+        '/app/data/faiss_index/meta.npy'
     """
     return os.path.join(FAISS_INDEX_DIR, "meta.npy")
 
@@ -406,8 +404,7 @@ def ensure_directories() -> None:
     Ensure all required directories exist, creating them if necessary.
 
     Creates:
-        - CONTAINER_HOST_DATA_DIR: Main data directory
-        - COMPARISONS_DIR: Model comparison results
+        - CONTAINER_DATA_DIR: Main data directory
         - FAISS_INDEX_DIR: Vector index files
         - Parent directory of SYMBOL_DB_PATH: Database directory
 
@@ -416,8 +413,7 @@ def ensure_directories() -> None:
         Should be called during application initialization.
     """
     directories = [
-        CONTAINER_HOST_DATA_DIR,
-        COMPARISONS_DIR,
+        CONTAINER_DATA_DIR,
         FAISS_INDEX_DIR,
         os.path.dirname(SYMBOL_DB_PATH),
     ]

@@ -1,479 +1,239 @@
-# C++ AI Assistant - Full Stack Web Application
+# AI Code Assistant
 
-A modern full-stack web application for AI-powered C++ code generation and analysis, featuring multiple free local LLM models, semantic code search, and an intuitive web interface.
+A full-stack web application for AI-powered code generation and analysis using local LLM models.
 
-## 🎯 Features
+## Features
 
-- **🎨 Modern Web Interface**: Responsive single-page app with dark/light theme
-- **🤖 Multi-Model Support**: 4 local LLM models (DeepSeek, CodeLlama, Qwen, StarCoder)
-- **⚖️ Model Comparison**: Compare outputs from multiple models side-by-side
-- **📥 Model Management**: Download/remove models directly from the UI
-- **🔍 Semantic Search**: FAISS-based vector search across C++ codebases
-- **📊 Symbol Extraction**: Extract and index C++ symbols using libclang
-- **⚡ Real-time Streaming**: WebSocket-based live code generation
-- **🎛️ Interactive Controls**: Sliders for temperature and max tokens with helpful hints
-- **🔄 Progress Indicators**: Real-time feedback during code generation
-- **🐳 Containerized**: Docker/Podman ready with volume persistence
-- **🆓 100% Free**: All models run locally, no API keys needed
+- **Modern Web Interface**: Responsive single-page app with dark/light theme
+- **Multi-Model Support**: 4 local LLM models (DeepSeek, CodeLlama, Qwen, StarCoder)
+- **Model Management**: Download/remove models directly from the UI
+- **Semantic Search**: FAISS-based vector search across code repositories
+- **Symbol Extraction**: Extract and index code symbols using libclang
+- **Real-time Streaming**: Server-Sent Events for live progress updates
+- **Containerized**: Docker ready with volume persistence
+- **100% Free**: All models run locally, no API keys needed
 
-## 🚀 Quick Start
-
-### 1. Clone and Navigate
+## Quick Start
 
 ```bash
-cd /path/to/llm-cpp
-```
-
-### 2. Start Containers
-
-```bash
-# Using Podman
-podman-compose up -d
-
-# Or using Docker
+# Start containers
 docker-compose up -d
+
+# Access the application
+open http://localhost:8080
 ```
 
-**First-time startup**: Models (~16 GB) will download automatically. This takes 10-30 minutes depending on your internet speed.
+**First-time startup**: Models (~16 GB) will download automatically (10-30 minutes).
 
-### 3. Access the Application
-
-**🌐 Open in your browser**: http://localhost:8080
-
-That's it! You'll see the web interface with 5 tabs:
-- **Generate Code** - Single model code generation
-- **Compare Models** - Side-by-side comparison
-- **Search Symbols** - Search your C++ codebase
-- **Index Repository** - Index new repositories
+### Web Interface Tabs
+- **Generate Code** - AI code generation with streaming support
+- **Search Symbols** - Search indexed code repositories
+- **Index Repository** - Index new repositories with smart incremental updates
 - **Manage Models** - Download/remove models
 
-### 4. Verify Everything Works
-
-Open http://localhost:8080 and you should see:
-- ✅ Green "Healthy" status indicator
-- ✅ Model dropdown populated with downloaded models
-- ✅ All 5 tabs accessible
-
-**Advanced users** can access API docs at:
+### API Documentation
 - Swagger UI: http://localhost:8080/docs
 - ReDoc: http://localhost:8080/redoc
-```
 
----
+## Usage Guide
 
-## 📖 Web Interface Guide
+### Generate Code
+1. Enter a prompt (e.g., "Write a function to reverse a string")
+2. Select a model from dropdown
+3. Adjust **Max Tokens** (100-8000) and **Temperature** (0.0-2.0)
+   - Recommended for code: Temperature 0.1-0.3, Max Tokens 2000
+4. Toggle **Enable Streaming** for real-time token generation
+5. Click "Generate Code" or press `Ctrl+Enter`
 
-### **Main Features**
-
-#### 1. **Generate Code** Tab
-- Enter a prompt (e.g., "Write a function to reverse a string")
-- Select a model from dropdown (only downloaded models shown)
-- **Max Tokens Slider**: Control output length (100-8000)
-  - 100 = Short snippets
-  - 2000 = Balanced (default, recommended)
-  - 8000 = Comprehensive with examples
-- **Temperature Slider**: Control creativity (0.0-2.0)
-  - 0.1-0.3 = Deterministic (recommended for C++)
-  - 0.5-0.7 = Balanced
-  - 1.0+ = Creative/experimental
-- Click "Generate Code" or press `Ctrl+Enter`
-- Watch real-time progress indicator
-- View syntax-highlighted code with clang-tidy warnings
-
-#### 2. **Compare Models** Tab
-- Select multiple models to compare (2-4 recommended)
-- Configure max tokens and temperature (same for all models for fair comparison)
-- Click "Compare Models"
-- Watch progress for each model independently
-- View side-by-side comparison cards showing:
-  - Generated code with syntax highlighting
-  - Generation time
-  - Code length
-  - Model description
-  - Error/timeout indicators
-
-#### 3. **Search Symbols** Tab
-- Semantic search across indexed C++ codebases
+### Search Symbols
+- Semantic search across indexed code repositories
 - Find functions, classes, variables by description
 - Filter by repository
-- View file location and signatures
 
-#### 4. **Index Repository** Tab
-- Index C++ repositories for search
-- Background processing with progress
-- Parallel indexing support
+### Index Repository
+- Index code repositories for search
+- Supports parallel indexing and smart incremental updates (git-aware)
+- Real-time progress tracking via Server-Sent Events
 
-#### 5. **Manage Models** Tab ⭐ NEW
-- View all available models in table
-- See download status (green = downloaded)
+### Manage Models
+- View all available models with download status
 - Download/remove models from UI
-- Bulk operations support
+- See model size, license, and description
 
-### **UI Features**
+## Architecture
 
-- 🌓 **Dark/Light Theme**: Toggle in header
-- 📱 **Responsive**: Works on mobile devices
-- ⚡ **Real-time Status**: Connection indicator in header
-- 💾 **Persistent Settings**: Theme saved to localStorage
-- 🎛️ **Interactive Sliders**: Visual controls for temperature and max tokens
-- 📊 **Progress Indicators**: Real-time feedback during generation
-- 🔄 **Auto-refresh**: Model dropdown updates after downloads
+**Frontend**: Vanilla JavaScript (index.html, styles.css, app.js)
+**Backend**: Python FastAPI (api_server.py, llm_client.py, vector_store.py, database.py)
+**LLM Engine**: Ollama (runs in separate container)
+**Storage**: SQLite (symbols), FAISS (vector search)
+**Indexing**: Smart incremental indexer (git-aware, only processes changed files)
 
----
-
-## 🏗️ Architecture
-
-### **Technology Stack**
-
-**Frontend** (Vanilla JavaScript - No frameworks!)
-- `index.html` - Single-page application structure
-- `styles.css` - Modern CSS with variables, animations
-- `app.js` - Event handling, API calls, WebSocket client
-
-**Backend** (Python FastAPI)
-- `api_server.py` - REST API + WebSocket server
-- `llm_client.py` - Ollama integration
-- `vector_store.py` - FAISS semantic search
-- `database.py` - SQLite symbol storage
-
-**LLM Engine** (Ollama)
-- Runs in separate container
-- Serves 4 local models
-- Accessed via HTTP API
-
-### **WebSocket Usage**
-
-**Purpose**: Real-time streaming code generation (optional feature)
-
-**Who uses it**:
-- Frontend `app.js` can optionally use WebSocket for streaming
-- Currently disabled by default (uses HTTP POST instead)
-- Available at `ws://localhost:8080/ws/generate`
-
-**Why it exists**:
-- Allows character-by-character streaming (like ChatGPT)
-- Better UX for long generations
-- Can be enabled in future for live code streaming
-
-**Current behavior**:
-- Frontend uses HTTP POST `/generate` (simpler, more reliable)
-- WebSocket endpoint available but not actively used
-- Can be enabled by setting `useStream = true` in `app.js`
-
----
-
-## 🔌 API Reference (Advanced Users)
-
-This is a **web application**, not an API service. However, the REST API is available for advanced users who want to integrate with other tools.
-
-### **Base URL**: `http://localhost:8080`
-
-### **Key Endpoints**
-
-#### Health & Status
-
-```bash
-# Health check
-GET /health
-
-# List all models with download status
-GET /models
-
-# List only downloaded models
-GET /models/downloaded
+```
+Browser (8080) → FastAPI Server → Ollama Container → Local Models
+                      ↓
+                SQLite + FAISS
 ```
 
-#### Model Management
+### Docker Architecture
+
+- **Container 1 (ollama)**: Ollama LLM server
+  - Port: 11434
+  - Volume: `.llm_models` → `/root/.ollama` (model cache)
+
+- **Container 2 (ai-assistant)**: FastAPI application
+  - Port: 8080
+  - Volumes:
+    - `assistant_data` → `/app/data` (persistent data: database, FAISS index, logs)
+    - `~/src` → `/repos` (read-only: source code repositories)
+    - `./src` → `/app/src` (dev mode: live code updates)
+    - `./frontend` → `/app/frontend` (dev mode: live frontend updates)
+
+## API Endpoints
+
+**Base URL**: `http://localhost:8080`
+
+**Total**: 14 active endpoints (all used by frontend)
+
+### Endpoints by Category
 
 ```bash
-# Download a model
-POST /models/{model_key}/download
+# Frontend (1)
+GET  /                                      # Serve frontend HTML
 
-# Remove a model
-DELETE /models/{model_key}
+# Health & Status (1)
+GET  /health                                # Health check and system status
+
+# Model Management (4)
+GET    /models                              # List all models with download status
+GET    /models/downloaded                   # List only downloaded models
+POST   /models/{model_key}/download         # Download a model
+DELETE /models/{model_key}                  # Delete a downloaded model
+
+# Code Generation (2)
+POST /generate                              # Non-streaming code generation
+POST /generate/stream                       # Streaming code generation (SSE)
+
+# Symbol Search (2)
+GET  /symbols/stats                         # Get symbol statistics
+GET  /symbols/repo/{repo_name}              # Get symbols from repository
+
+# Repository Management (2)
+GET    /repositories                        # List all indexed repositories
+DELETE /repositories/{repo_name}            # Delete repository from index
+
+# Indexing (2)
+POST /index                                 # Start repository indexing
+GET  /index/progress/{repo_name}/stream     # Stream indexing progress (SSE)
 ```
 
-#### Code Generation
+**Full API Documentation**: http://localhost:8080/docs
 
-```bash
-# Generate code with single model
-POST /generate
-{
-  "prompt": "Write a C++ function to reverse a string",
-  "model": "deepseek-coder",
-  "temperature": 0.2,
-  "max_tokens": 2000,
-  "format_code": true,
-  "check_code": true
-}
-
-# Compare multiple models
-POST /compare
-{
-  "prompt": "Write a binary search function",
-  "models": ["deepseek-coder", "codellama"],
-  "parallel": true
-}
-```
-
-#### Symbol Search
-
-```bash
-# Search symbols
-POST /search
-{
-  "query": "function to parse JSON",
-  "top_k": 10,
-  "repo_filter": "my-project"
-}
-```
-
-#### Repository Indexing
-
-```bash
-# Index a repository
-POST /index
-{
-  "repo_path": "my-cpp-project",
-  "parallel": true,
-  "rebuild_vectors": true
-}
-
-# Get database statistics
-GET /stats
-```
-
-**📚 Full API Documentation**:
-- Interactive Swagger UI: http://localhost:8080/docs
-- ReDoc: http://localhost:8080/redoc
-
-**Note**: Most users should use the web interface at http://localhost:8080 instead of calling the API directly.
-
----
-
-## 🤖 Supported Models
+## Supported Models
 
 | Model | Size | License | Best For |
 |-------|------|---------|----------|
-| **DeepSeek Coder** | 3.8 GB | MIT | General code generation ⭐ |
+| **DeepSeek Coder** | 3.8 GB | MIT | General code generation (recommended) |
 | **CodeLlama** | 3.8 GB | Llama 2 | Meta's code specialist |
 | **Qwen2.5 Coder** | 4.7 GB | Apache 2.0 | Fast & efficient |
 | **StarCoder2** | 4.0 GB | BigCode OpenRAIL-M | Multi-language support |
 
 **Total**: ~16 GB for all models
+**Storage**: Models cached in `.llm_models/` (persists across restarts)
+**Download**: Automatic on first startup (configurable via `.env`)
 
-### **Model Management**
-
-Models are automatically downloaded on first startup. You can also:
-
-1. **Via Web UI**: Go to "Manage Models" tab
-2. **Via Script**: Run `./setup_models.sh`
-3. **Via API**: `POST /models/{model_key}/download`
-
-Models are cached in `.llm_models/` and persist across container restarts.
-
----
-
-## ⚙️ Configuration
-
-### **Environment Variables**
+## Configuration
 
 Edit `.env` file to customize:
 
 ```bash
-# Model Configuration
-ENABLED_MODELS=all  # or comma-separated: deepseek-coder,codellama
-AUTO_PULL_MODELS=true  # Auto-download models on startup
+# Docker Configuration
+COMPOSE_PROJECT_NAME=ai-assistant        # Docker Compose project name
+HOST_REPOS_DIR=~/src                     # Source code repositories directory
 
-# Ollama Configuration
-OLLAMA_URL=http://ollama:11434
+# Model Configuration
+ENABLED_MODELS=all                       # or comma-separated: deepseek-coder,codellama
+AUTO_PULL_MODELS=true                    # Auto-download models on startup
 
 # Performance Tuning (optional)
-SYMBOL_BATCH_SIZE=100
-EMBEDDING_BATCH_SIZE=32
-SYMBOL_EXTRACTOR_WORKERS=4
+SYMBOL_BATCH_SIZE=100                    # Symbols per database batch
+EMBEDDING_BATCH_SIZE=32                  # Symbols per embedding batch
+SYMBOL_EXTRACTOR_WORKERS=4               # Parallel extraction workers
+WATCH_DEBOUNCE_SECONDS=2.0               # File change debounce delay
 ```
 
-### **Multi-Directory Support**
+### Data Persistence
 
-Mount multiple source directories:
+| Location | Type | Purpose |
+|----------|------|---------|
+| `.llm_models/` | Host directory | Ollama model cache (~16 GB) |
+| `assistant_data` | Docker volume | Database, FAISS index, logs |
+| `~/src/` | Host directory | Source code repositories (read-only) |
 
-```yaml
-# docker-compose.yml
-volumes:
-  - ~/src:/repos/src1
-  - ~/projects:/repos/src2
-  - ~/work:/repos/src3
-```
+**Note**: The `assistant_data` Docker volume persists across container restarts and is mounted at `/app/data` inside the container.
 
----
-
-## 🏗️ Architecture
-
-```
-┌─────────────────────┐         ┌─────────────────────┐
-│  Web Browser        │  HTTP   │  Assistant          │
-│  (Port 8080)        │ ──────> │  Container          │
-│                     │         │  - FastAPI Server   │
-│  - Modern UI        │         │  - Python Code      │
-│  - 5 Tabs           │         │  - SQLite DB        │
-│  - Model Mgmt       │         │  - FAISS Index      │
-└─────────────────────┘         └──────────┬──────────┘
-                                           │ HTTP API
-                                           ▼
-                                ┌─────────────────────┐
-                                │  Ollama             │
-                                │  Container          │
-                                │  - Model Storage    │
-                                │  - Inference Engine │
-                                └──────────┬──────────┘
-                                           │
-                                           ▼
-                                ┌─────────────────────┐
-                                │  .llm_models/       │
-                                │  (Host Storage)     │
-                                │  ~16 GB cached      │
-                                └─────────────────────┘
-```
-
-### **Data Persistence**
-
-| Directory | Purpose | Size |
-|-----------|---------|------|
-| `.llm_models/` | Ollama model cache | ~16 GB |
-| `.host_data/` | SQLite DB, FAISS index, comparisons | ~100 MB |
-| `~/src/` | Your C++ source code (read-only) | Variable |
-
----
-
-## 🧪 Testing
-
-See **TESTING.md** for comprehensive testing procedures including:
-- 20+ test scenarios
-- API endpoint testing
-- Model comparison testing
-- Performance benchmarks
-- Troubleshooting guide
-
----
-
-## 📚 Additional Documentation
-
-- **TESTING.md** - Comprehensive testing guide with 20+ test procedures
-- **QUICK_REFERENCE.md** - Fast reference for common tasks and configurations
-
----
-
-## 🛠️ Troubleshooting
-
-### **Models not showing as downloaded**
+## Troubleshooting
 
 ```bash
-# Check Ollama has models
-podman exec -it llm-cpp-ollama-1 ollama list
+# Check running containers
+docker ps
 
-# Restart containers
-podman-compose restart
-```
+# View logs
+docker-compose logs -f
 
-### **Frontend not loading**
+# Check Ollama models
+docker exec -it ollama ollama list
 
-```bash
-# Rebuild container (includes frontend files)
-podman-compose build assistant
-podman-compose up -d
-```
+# Restart services
+docker-compose restart
 
-### **Permission errors**
+# Clean restart (removes volumes)
+docker-compose down -v
+docker-compose up -d --build
 
-```bash
-# Fix permissions
-chmod 777 .host_data
+# Permission errors
 chmod 777 .llm_models
+
+# Port already in use
+# Edit docker-compose.yml: ports: - "8081:8080"
 ```
 
-### **Port already in use**
+## Best Practices
+
+**Temperature Settings**:
+- Production code: 0.1-0.2 (deterministic, consistent)
+- Exploring solutions: 0.4-0.6 (more creative)
+- Recommended: 0.2
+
+**Model Selection**:
+- **DeepSeek Coder**: Best all-around (recommended)
+- **CodeLlama**: Standard algorithms and patterns
+- **Qwen2.5**: Fastest inference speed
+- **StarCoder2**: Complex multi-file projects
+
+**Indexing**:
+- Use smart incremental indexing (default) for faster updates
+- Force full re-index only when necessary
+- Index repositories before using symbol search
+
+---
+
+## Get Started
 
 ```bash
-# Change port in docker-compose.yml
-ports:
-  - "8081:8080"  # Use 8081 instead
-```
+# Clone and start
+git clone <your-repo>
+cd my_llm
+docker-compose up -d
 
----
-
-## 🎯 Best Practices
-
-### **Temperature Settings for C++**
-
-| Use Case | Temperature | Why |
-|----------|-------------|-----|
-| Production code | 0.1 - 0.2 | Deterministic, reliable |
-| Bug fixes | 0.1 | Maximum consistency |
-| Exploring solutions | 0.4 - 0.6 | See alternatives |
-| Learning | 0.3 - 0.5 | Balance of standard + creative |
-
-**Recommendation**: Use 0.2 for most C++ code generation.
-
-### **Model Selection**
-
-- **DeepSeek Coder**: Best all-around choice ⭐
-- **CodeLlama**: Good for standard algorithms
-- **Qwen2.5**: Fastest inference
-- **StarCoder2**: Best for complex multi-file projects
-
----
-
-## 📦 Project Structure
-
-```
-llm-cpp/
-├── src/                    # Python source code
-│   ├── api_server.py      # FastAPI server (854 lines)
-│   ├── llm_client.py      # Ollama client (619 lines)
-│   ├── vector_store.py    # FAISS search
-│   ├── symbol_extractor.py # libclang parser
-│   ├── database.py        # SQLite operations
-│   └── ...
-├── frontend/              # Web interface
-│   ├── index.html        # Main HTML (338 lines)
-│   ├── styles.css        # Styles (737 lines)
-│   └── app.js            # JavaScript (774 lines)
-├── examples/             # Example clients
-│   ├── api_client.py     # Python client
-│   └── api_examples.sh   # Bash examples
-├── .env                  # Configuration
-├── docker-compose.yml    # Container orchestration
-├── Dockerfile           # Container definition
-├── requirements.txt     # Python dependencies
-├── setup_models.sh      # Manual model download script
-├── README.md           # This file
-├── TESTING.md          # Testing guide
-└── QUICK_REFERENCE.md  # Quick reference
-```
-
----
-
-## 🚀 Summary
-
-**What You Get:**
-
-✅ **Zero-config startup** - Just run `podman-compose up -d`
-✅ **Auto model downloads** - No manual setup required
-✅ **Modern web interface** - Beautiful, responsive, intuitive
-✅ **4 LLM models** - Compare and choose the best
-✅ **Interactive controls** - Sliders for temperature and max tokens
-✅ **Real-time feedback** - Progress indicators and streaming
-✅ **100% local & free** - No API keys, no cloud dependencies
-✅ **Production-ready** - Containerized, persistent, scalable
-
-**Get started in 3 commands:**
-
-```bash
-cd /path/to/llm-cpp
-podman-compose up -d
+# Access the application
 open http://localhost:8080
 ```
 
-**That's it!** 🎉
-
+**What you get:**
+- Zero-config startup
+- Auto model downloads
+- Modern web interface
+- 14 REST API endpoints
+- 4 local LLM models
+- 100% free & local
+- No API keys needed

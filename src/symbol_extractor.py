@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Symbol extractor for C++ codebases using libclang.
+Symbol extractor for code codebases using libclang.
 Optimized for performance with batch inserts and better error handling.
 """
 
@@ -19,7 +19,7 @@ from constants import SYMBOL_BATCH_SIZE, SYMBOL_EXTRACTOR_WORKERS, CPP_EXTENSION
 
 def extract_from_file(repo: str, filepath: str) -> List[Tuple]:
     """
-    Extract symbols from a single C++ file using libclang.
+    Extract symbols from a single code file using libclang.
 
     Args:
         repo: Repository name
@@ -92,7 +92,7 @@ def process_file_batch(repo: str, filepaths: List[str]) -> List[Tuple]:
 
 def index_repo(repo_path: str, parallel: bool = True) -> bool:
     """
-    Index a C++ repository and extract all symbols.
+    Index a code repository and extract all symbols.
     Optimized with batch inserts and optional parallel processing.
 
     Args:
@@ -109,7 +109,7 @@ def index_repo(repo_path: str, parallel: bool = True) -> bool:
     print(f"Indexing repository: {repo_path}")
     print(f"Parallel processing: {'enabled' if parallel else 'disabled'}")
 
-    # Collect all C++ files
+    # Collect all code files
     repo_path_obj = Path(repo_path)
     cpp_files = []
 
@@ -119,10 +119,10 @@ def index_repo(repo_path: str, parallel: bool = True) -> bool:
     cpp_files = [str(f) for f in cpp_files]
 
     if not cpp_files:
-        print(f"Warning: No C++ files found in {repo_path}")
+        print(f"Warning: No code files found in {repo_path}")
         return False
 
-    print(f"Found {len(cpp_files)} C++ files")
+    print(f"Found {len(cpp_files)} code files")
 
     # Initialize database
     if not init_database():

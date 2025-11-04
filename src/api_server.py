@@ -1,12 +1,12 @@
 #!/usr/bin/env python3
 """
-FastAPI REST API Server for C++ AI Assistant.
+FastAPI REST API Server for AI Code Assistant.
 Provides endpoints for code generation, model comparison, symbol search, and indexing.
 """
 
 from fastapi import FastAPI, HTTPException, BackgroundTasks, Query
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import JSONResponse, FileResponse, HTMLResponse, StreamingResponse
+from fastapi.responses import FileResponse, HTMLResponse, StreamingResponse
 from fastapi.staticfiles import StaticFiles
 import asyncio
 import time
@@ -28,12 +28,10 @@ from llm_client import (
     pull_model,
     remove_model
 )
-from vector_store import search_symbols as search_symbols_semantic, build_index
+from vector_store import build_index
 from database import (
-    get_symbol_count,
     get_symbols_by_repo,
     get_database_stats,
-    search_symbols as search_symbols_by_name,
     init_database,
     get_repositories,
     delete_symbols_by_repo
@@ -41,7 +39,6 @@ from database import (
 from symbol_extractor import index_repo
 from smart_incremental_indexer import smart_index_repo
 from constants import (
-    COMPARISONS_DIR,
     OLLAMA_URL,
     ensure_directories
 )
@@ -97,72 +94,52 @@ class HealthResponse(BaseModel):
 # ============================================================================
 
 app = FastAPI(
-    title="C++ AI Assistant API",
+    title="AI Code Assistant API",
     description="""
-## C++ AI Assistant REST API
+## AI Code Assistant REST API
 
-AI-powered code generation, repository indexing, and symbol search for C++ projects.
+AI-powered code generation, repository indexing, and symbol search for software projects.
 
-### Features
-- 🤖 **Code Generation**: Generate C++ code using local LLM models (streaming & non-streaming)
-- 📚 **Repository Indexing**: Index C++ repositories for symbol search
-- 🔍 **Symbol Search**: Search for functions, classes, and variables
-- 📦 **Model Management**: Download and manage local LLM models
+### Quick Start
 
-### Endpoint Categories
-- **🟢 Public**: Used by frontend UI (14 endpoints)
-- **🔴 Unused**: Available but not currently used (3 endpoints)
+1. **Health Check**: `GET /health`
+2. **List Models**: `GET /models`
+3. **Generate Code**: `POST /generate/stream`
+4. **Index Repository**: `POST /index`
+5. **View Repositories**: `GET /repositories`
 
 ### Technology Stack
+
 - **Backend**: FastAPI + Python 3.12
 - **LLMs**: Ollama (DeepSeek Coder, CodeLlama, Qwen2.5-Coder, StarCoder2)
 - **Storage**: SQLite + FAISS vector index
-- **Frontend**: Vanilla JavaScript + marked.js + highlight.js
+- **Frontend**: Vanilla JavaScript
+- **Code Analysis**: libclang
+
+### Endpoints
+
+**14 Active Endpoints** (all used by frontend):
+- **Frontend** (1): Serve HTML
+- **Health & Status** (1): Health check
+- **Model Management** (4): List, download, delete models
+- **Code Generation** (2): HTTP and SSE streaming
+- **Symbol Search** (2): Stats and repository symbols
+- **Repository Management** (2): List and delete repositories
+- **Indexing** (2): Start indexing and stream progress
+
+Browse the endpoints below for detailed documentation and schemas.
     """,
     version="1.0.0",
     docs_url="/docs",
     redoc_url="/redoc",
     openapi_tags=[
-        {
-            "name": "🟢 Frontend",
-            "description": "**PUBLIC** - Serve frontend HTML and static files. Used by browser."
-        },
-        {
-            "name": "🟢 Health & Status",
-            "description": "**PUBLIC** - Health check endpoint. Used by frontend for status monitoring."
-        },
-        {
-            "name": "🔴 API Info",
-            "description": "**UNUSED** - API information endpoint. Not currently used but useful for API discovery."
-        },
-        {
-            "name": "🟢 Model Management",
-            "description": "**PUBLIC** - Download, list, and delete LLM models. Used by frontend Models tab."
-        },
-        {
-            "name": "🔴 Model Discovery",
-            "description": "**UNUSED** - List all available models. Frontend uses /models/downloaded instead."
-        },
-        {
-            "name": "🟢 Code Generation",
-            "description": "**PUBLIC** - Generate C++ code using LLM models. Used by frontend Generate tab."
-        },
-        {
-            "name": "🟢 Symbol Search",
-            "description": "**PUBLIC** - Search indexed symbols and get statistics. Used by frontend Index tab."
-        },
-        {
-            "name": "🟢 Repository Management",
-            "description": "**PUBLIC** - List and delete indexed repositories. Used by frontend Index tab."
-        },
-        {
-            "name": "🟢 Indexing",
-            "description": "**PUBLIC** - Index C++ repositories and stream progress. Used by frontend Index tab."
-        },
-        {
-            "name": "🔴 Indexing (Polling)",
-            "description": "**UNUSED** - Polling-based progress endpoint. Frontend uses SSE stream instead."
-        }
+        {"name": "Frontend", "description": "Serve frontend HTML and static files"},
+        {"name": "Health & Status", "description": "Health check and system status"},
+        {"name": "Model Management", "description": "Download, list, and delete LLM models"},
+        {"name": "Code Generation", "description": "Generate code using LLM models"},
+        {"name": "Symbol Search", "description": "Search indexed symbols and statistics"},
+        {"name": "Repository Management", "description": "List and delete indexed repositories"},
+        {"name": "Indexing", "description": "Index repositories with progress tracking"}
     ]
 )
 
@@ -189,24 +166,23 @@ async def startup_event():
     Initializes database and checks for required models.
     """
     print("\n" + "="*60)
-    print("🚀 AI Assistant - Server Starting Up")
+    print("🚀 AI Code Assistant - Server Starting")
     print("="*60)
 
     # Initialize database
     if init_database():
-        print("✅ Database initialized successfully")
+        print("✅ Database initialized")
     else:
         print("⚠️ Database initialization failed (will retry on first use)")
 
+    # Get actually loaded models from Ollama
+    loaded_models = get_installed_models()
+
     print("\n📦 Model Configuration:")
     print(f"   Ollama URL: {OLLAMA_URL}")
-    print(f"   Shared model storage: ./.llm_models")
-    print(f"   Available models: {list(AVAILABLE_LOCAL_MODELS.keys())}")
-    print(f"   ℹ️  Models in shared storage will be used automatically")
-    print(f"   ℹ️  Download models using the 'Manage Models' tab in the UI")
-    print("="*60)
-
-    print("\n✅ Server startup complete!\n")
+    print(f"   Model storage: ./.llm_models")
+    print(f"\n📦 Loaded models: {loaded_models if loaded_models else 'None (download via UI)'}")
+    print("="*60 + "\n")
 
 # ============================================================================
 # STATIC FILES & FRONTEND
@@ -220,9 +196,9 @@ if frontend_path.exists():
 @app.get(
     "/",
     response_class=HTMLResponse,
-    tags=["🟢 Frontend"],
+    tags=["Frontend"],
     summary="Serve Frontend HTML",
-    description="**PUBLIC** - Serves the main frontend HTML page. Used by browser on initial page load."
+    description="Serves the main frontend HTML page"
 )
 async def serve_frontend():
     """Serve the frontend HTML."""
@@ -230,34 +206,18 @@ async def serve_frontend():
     if frontend_file.exists():
         return FileResponse(frontend_file)
     else:
-        return HTMLResponse(content="<h1>C++ AI Assistant API</h1><p>Frontend not found. Visit <a href='/docs'>/docs</a> for API documentation.</p>")
+        return HTMLResponse(content="<h1>AI Code Assistant API</h1><p>Frontend not found. Visit <a href='/docs'>/docs</a> for API documentation.</p>")
 
 # ============================================================================
 # HEALTH & STATUS ENDPOINTS
 # ============================================================================
 
 @app.get(
-    "/api",
-    response_model=Dict[str, str],
-    tags=["🔴 API Info"],
-    summary="API Information",
-    description="**UNUSED** - Returns API metadata. Not currently used by frontend but useful for API discovery."
-)
-async def api_info():
-    """API information endpoint."""
-    return {
-        "name": "C++ AI Assistant API",
-        "version": "1.0.0",
-        "docs": "/docs",
-        "health": "/health"
-    }
-
-@app.get(
     "/health",
     response_model=HealthResponse,
-    tags=["🟢 Health & Status"],
+    tags=["Health & Status"],
     summary="Health Check",
-    description="**PUBLIC** - Verify all services are running. Used by frontend for status monitoring."
+    description="Verify all services are running and get system status"
 )
 async def health_check():
     """Health check endpoint - verify all services are running."""
@@ -268,13 +228,10 @@ async def health_check():
 
         # Check Ollama instance
         try:
-            print(f"Calling Ollama at {OLLAMA_URL}/api/tags with timeout 2s...")
             response = requests.get(f"{OLLAMA_URL}/api/tags", timeout=2)
             if response.status_code != 200:
-                print(f"⚠️  Ollama is not responding")
                 ollama_available = False
-        except Exception as e:
-            print(f"⚠️  Ollama is not available: {e}")
+        except Exception:
             ollama_available = False
 
         # Get database stats
@@ -295,14 +252,13 @@ async def health_check():
 @app.get(
     "/models",
     response_model=Dict[str, Any],
-    tags=["🔴 Model Discovery"],
+    tags=["Model Management"],
     summary="List All Models",
-    description="""**UNUSED** - List all available models with metadata and download status.
+    description="""**PUBLIC** - List all available models with metadata and download status.
 
-Frontend uses `/models/downloaded` instead. This endpoint is useful for:
-- Discovering all available models (not just downloaded)
-- Getting full model metadata
-- API clients that need complete model list
+Used by frontend Models tab to populate the models table. Shows all available models
+with their download status, size, and metadata. This is different from `/models/downloaded`
+which only returns downloaded models for the dropdown.
     """
 )
 async def list_models():
@@ -333,7 +289,7 @@ async def list_models():
 @app.get(
     "/models/downloaded",
     response_model=Dict[str, Any],
-    tags=["🟢 Model Management"],
+    tags=["Model Management"],
     summary="List Downloaded Models",
     description="**PUBLIC** - List only downloaded models. Used by frontend Models tab to populate model dropdown."
 )
@@ -360,7 +316,7 @@ async def list_downloaded_models(no_cache: bool = False, metadata: bool = False)
 @app.post(
     "/models/{model_key}/download",
     response_model=Dict[str, Any],
-    tags=["🟢 Model Management"],
+    tags=["Model Management"],
     summary="Download Model",
     description="**PUBLIC** - Download a specific model. Used by frontend Models tab when user clicks download button."
 )
@@ -387,14 +343,7 @@ async def download_model(model_key: str, background_tasks: BackgroundTasks):
         }
 
     # Start download in background
-    def download_task():
-        success = pull_model(model_key)
-        if success:
-            print(f"✅ Background download completed: {model_key}")
-        else:
-            print(f"❌ Background download failed: {model_key}")
-
-    background_tasks.add_task(download_task)
+    background_tasks.add_task(pull_model, model_key)
 
     return {
         "status": "downloading",
@@ -406,7 +355,7 @@ async def download_model(model_key: str, background_tasks: BackgroundTasks):
 @app.delete(
     "/models/{model_key}",
     response_model=Dict[str, Any],
-    tags=["🟢 Model Management"],
+    tags=["Model Management"],
     summary="Delete Model",
     description="**PUBLIC** - Remove/delete a specific model. Used by frontend Models tab when user clicks delete button."
 )
@@ -457,9 +406,9 @@ async def delete_model(model_key: str):
 @app.post(
     "/generate",
     response_model=CodeGenerationResponse,
-    tags=["🟢 Code Generation"],
+    tags=["Code Generation"],
     summary="Generate Code (Non-Streaming)",
-    description="""**PUBLIC** - Generate C++ code using a single model (non-streaming).
+    description="""Generate code using a single model (non-streaming).
 
 Used by frontend Generate tab when streaming is disabled. Returns complete response at once.
 For real-time streaming, use `/generate/stream` instead.
@@ -467,12 +416,12 @@ For real-time streaming, use `/generate/stream` instead.
 )
 async def generate_code(request: CodeGenerationRequest):
     """
-    Generate C++ code using a single model.
+    Generate code using a single model.
 
     Example:
         POST /generate
         {
-            "prompt": "Write a C++ function to reverse a string",
+            "prompt": "Write a function to reverse a string",
             "model": "deepseek-coder",
             "max_tokens": 2000,
             "temperature": 0.2
@@ -529,9 +478,9 @@ async def generate_code(request: CodeGenerationRequest):
 
 @app.post(
     "/generate/stream",
-    tags=["🟢 Code Generation"],
+    tags=["Code Generation"],
     summary="Generate Code (Streaming)",
-    description="""**PUBLIC** - Generate C++ code with real-time streaming using Server-Sent Events (SSE).
+    description="""Generate code with real-time streaming using Server-Sent Events (SSE).
 
 Used by frontend Generate tab when streaming is enabled. Tokens are sent as they're generated,
 providing real-time feedback to the user. Frontend renders markdown incrementally every 100ms.
@@ -539,13 +488,13 @@ providing real-time feedback to the user. Frontend renders markdown incrementall
 )
 async def generate_code_stream(request: CodeGenerationRequest):
     """
-    Generate C++ code using a single model with streaming enabled.
+    Generate code using a single model with streaming enabled.
     Returns Server-Sent Events (SSE) stream of tokens as they're generated.
 
     Example:
         POST /generate/stream
         {
-            "prompt": "Write a C++ function to reverse a string",
+            "prompt": "Write a function to reverse a string",
             "model": "deepseek-coder",
             "max_tokens": 2000,
             "temperature": 0.2
@@ -588,11 +537,9 @@ async def generate_code_stream(request: CodeGenerationRequest):
 
             try:
                 # Send initial event
-                print(f"[SSE] Sending start event for model {request.model}")
                 yield f"data: {json.dumps({'status': 'started', 'model': request.model})}\n\n"
 
                 # Stream tokens from Ollama
-                token_count = 0
                 for chunk in client.generate_stream(
                     request.prompt,
                     max_tokens=request.max_tokens,
@@ -600,7 +547,6 @@ async def generate_code_stream(request: CodeGenerationRequest):
                 ):
                     # Check for errors
                     if "error" in chunk:
-                        print(f"[SSE ERROR] {chunk['error']}")
                         yield f"data: {json.dumps({'error': chunk['error'], 'done': True})}\n\n"
                         return
 
@@ -608,16 +554,13 @@ async def generate_code_stream(request: CodeGenerationRequest):
                     if "response" in chunk:
                         token = chunk["response"]
                         full_response += token
-                        token_count += 1
                         yield f"data: {json.dumps({'token': token, 'done': False})}\n\n"
 
                     # Check if done
                     if chunk.get("done", False):
                         elapsed_time = time.time() - start_time
-                        print(f"[SSE] Stream complete: {token_count} tokens in {elapsed_time:.2f}s")
 
                         # Send completion event with metadata
-                        # Frontend will render markdown, no need to extract code
                         completion_data = {
                             "done": True,
                             "total_time": elapsed_time,
@@ -628,9 +571,6 @@ async def generate_code_stream(request: CodeGenerationRequest):
                         return
 
             except Exception as e:
-                print(f"[SSE EXCEPTION] {type(e).__name__}: {e}")
-                import traceback
-                traceback.print_exc()
                 yield f"data: {json.dumps({'error': str(e), 'done': True})}\n\n"
 
         # Return streaming response
@@ -658,7 +598,7 @@ async def generate_code_stream(request: CodeGenerationRequest):
 @app.get(
     "/symbols/stats",
     response_model=Dict[str, Any],
-    tags=["🟢 Symbol Search"],
+    tags=["Symbol Search"],
     summary="Get Symbol Statistics",
     description="**PUBLIC** - Get statistics about indexed symbols. Used by frontend Index tab to display stats."
 )
@@ -669,7 +609,6 @@ async def get_symbol_stats():
 
         # If stats are empty, database might not be initialized
         if not stats:
-            print("Database not initialized, attempting to initialize...")
             if init_database():
                 stats = get_database_stats()
 
@@ -683,7 +622,7 @@ async def get_symbol_stats():
 @app.get(
     "/symbols/repo/{repo_name}",
     response_model=Dict[str, Any],
-    tags=["🟢 Symbol Search"],
+    tags=["Symbol Search"],
     summary="Get Repository Symbols",
     description="**PUBLIC** - Get all symbols from a specific repository. Used by frontend when viewing repository symbols."
 )
@@ -703,7 +642,7 @@ async def get_repo_symbols(repo_name: str, limit: int = Query(100, ge=1, le=1000
 @app.get(
     "/repositories",
     response_model=Dict[str, Any],
-    tags=["🟢 Repository Management"],
+    tags=["Repository Management"],
     summary="List Repositories",
     description="**PUBLIC** - Get list of all indexed repositories. Used by frontend Index tab to display repository list."
 )
@@ -727,7 +666,7 @@ async def list_repositories():
 @app.delete(
     "/repositories/{repo_name}",
     response_model=Dict[str, Any],
-    tags=["🟢 Repository Management"],
+    tags=["Repository Management"],
     summary="Delete Repository",
     description="**PUBLIC** - Delete an indexed repository from database and FAISS index. Used by frontend Index tab when user clicks delete button."
 )
@@ -749,8 +688,7 @@ async def delete_repository(repo_name: str):
         try:
             build_index()
             index_rebuilt = True
-        except Exception as e:
-            print(f"Warning: Failed to rebuild FAISS index after deletion: {e}")
+        except Exception:
             index_rebuilt = False
 
         return {
@@ -769,9 +707,9 @@ async def delete_repository(repo_name: str):
 @app.post(
     "/index",
     response_model=Dict[str, Any],
-    tags=["🟢 Indexing"],
+    tags=["Indexing"],
     summary="Index Repository",
-    description="""**PUBLIC** - Index a C++ repository (extract symbols and build vector index).
+    description="""Index a repository (extract symbols and build vector index).
 
 Used by frontend Index tab when user clicks "Index Repository" button. This is a long-running
 background operation. Use `/index/progress/{repo_name}/stream` to monitor progress in real-time.
@@ -781,7 +719,7 @@ By default, uses smart incremental indexing (git-aware) that only re-indexes cha
 )
 async def index_repository(request: IndexRepoRequest, background_tasks: BackgroundTasks):
     """
-    Index a C++ repository (extract symbols and build vector index).
+    Index a repository (extract symbols and build vector index).
     This is a long-running operation, so it runs in the background.
 
     By default, uses smart incremental indexing that only re-indexes changed files.
@@ -863,9 +801,6 @@ async def index_repository(request: IndexRepoRequest, background_tasks: Backgrou
                     "elapsed_time": elapsed
                 })
             except Exception as e:
-                print(f"Background indexing failed: {e}")
-                import traceback
-                traceback.print_exc()
                 indexing_progress[repo_name].update({
                     "status": "error",
                     "progress": 0,
@@ -887,43 +822,10 @@ async def index_repository(request: IndexRepoRequest, background_tasks: Backgrou
         raise HTTPException(status_code=500, detail=f"Failed to start indexing: {str(e)}")
 
 @app.get(
-    "/index/progress/{repo_name}",
-    response_model=Dict[str, Any],
-    tags=["🔴 Indexing (Polling)"],
-    summary="Get Indexing Progress (Polling)",
-    description="""**UNUSED** - Get current indexing progress using polling.
-
-Frontend uses `/index/progress/{repo_name}/stream` (SSE) instead for real-time updates.
-This endpoint is useful for clients that don't support Server-Sent Events.
-    """
-)
-async def get_indexing_progress(repo_name: str):
-    """
-    Get the current indexing progress for a repository.
-
-    Args:
-        repo_name: Name of the repository being indexed
-
-    Returns:
-        Progress information including status, progress percentage, and message
-    """
-    if repo_name not in indexing_progress:
-        return {
-            "success": False,
-            "message": "No indexing in progress for this repository"
-        }
-
-    progress_info = indexing_progress[repo_name].copy()
-    return {
-        "success": True,
-        **progress_info
-    }
-
-@app.get(
     "/index/progress/{repo_name}/stream",
-    tags=["🟢 Indexing"],
+    tags=["Indexing"],
     summary="Stream Indexing Progress (SSE)",
-    description="""**PUBLIC** - Stream real-time indexing progress using Server-Sent Events (SSE).
+    description="""Stream real-time indexing progress using Server-Sent Events (SSE).
 
 Used by frontend Index tab to show real-time progress updates during repository indexing.
 Updates are sent every 500ms with status, progress percentage, and current message.
@@ -987,27 +889,12 @@ if __name__ == "__main__":
         port = int(sys.argv[1])
 
     print(f"""
-    ==========================================
-    🚀 C++ AI Assistant - Full Stack Server
-    ==========================================
-
-    🌐 Web Application: http://localhost:{port}
-
-    📱 Features:
-       ✅ Generate Code - Single or multi-model code generation with smart merge
-       ✅ Index Repository - Index C++ repositories for symbol search
-       ✅ Manage Models - Download/remove Ollama models
-
-    ⚙️  Technology Stack:
-       • Frontend: Vanilla JS + HTML5 + CSS3
-       • Backend: FastAPI (Python)
-       • LLM Engine: Ollama (local models)
-       • Code Analysis: libclang + FAISS
-
-    🔧 Advanced Users (API available at):
-       • Swagger UI: http://localhost:{port}/docs
-
-    ==========================================
+==========================================
+🚀 AI Code Assistant Server
+==========================================
+🌐 Web UI:  http://localhost:{port}
+🔧 API Docs: http://localhost:{port}/docs
+==========================================
     """)
 
     uvicorn.run(

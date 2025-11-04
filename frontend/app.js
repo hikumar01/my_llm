@@ -17,6 +17,40 @@ const state = {
 };
 
 // ============================================================================
+// API Helper Functions
+// ============================================================================
+async function apiRequest(endpoint, options = {}) {
+    const url = `${API_BASE_URL}${endpoint}`;
+    const response = await fetch(url, {
+        headers: { 'Content-Type': 'application/json', ...options.headers },
+        ...options
+    });
+
+    if (!response.ok && options.throwOnError !== false) {
+        const error = await response.json().catch(() => ({ detail: 'Request failed' }));
+        throw new Error(error.detail || `Request failed: ${response.status}`);
+    }
+
+    return response;
+}
+
+async function apiGet(endpoint) {
+    const response = await apiRequest(endpoint, { throwOnError: false });
+    return response.ok ? await response.json() : null;
+}
+
+async function apiPost(endpoint, data) {
+    return await apiRequest(endpoint, {
+        method: 'POST',
+        body: JSON.stringify(data)
+    });
+}
+
+async function apiDelete(endpoint) {
+    return await apiRequest(endpoint, { method: 'DELETE' });
+}
+
+// ============================================================================
 // Initialization
 // ============================================================================
 document.addEventListener('DOMContentLoaded', () => {
@@ -102,15 +136,17 @@ function initEventListeners() {
 // ============================================================================
 async function checkHealth() {
     try {
-        const response = await fetch(`${API_BASE_URL}/health`);
-        const data = await response.json();
-        
-        updateStatus(data.status === 'healthy', 
-            data.ollama_available ? 'Connected' : 'Ollama Unavailable');
-        
-        // Update available models if needed
-        if (data.available_models) {
-            console.log('Available models:', data.available_models);
+        const data = await apiGet('/health');
+        if (data) {
+            updateStatus(data.status === 'healthy',
+                data.ollama_available ? 'Connected' : 'Ollama Unavailable');
+
+            // Update available models if needed
+            if (data.available_models) {
+                console.log('Available models:', data.available_models);
+            }
+        } else {
+            updateStatus(false, 'Disconnected');
         }
     } catch (error) {
         updateStatus(false, 'Disconnected');
@@ -202,21 +238,12 @@ function hideGenerateProgress() {
 }
 
 async function generateWithHTTP(prompt, model, maxTokens, temperature) {
-    const response = await fetch(`${API_BASE_URL}/generate`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-            prompt,
-            model,
-            max_tokens: maxTokens,
-            temperature
-        })
+    const response = await apiPost('/generate', {
+        prompt,
+        model,
+        max_tokens: maxTokens,
+        temperature
     });
-
-    if (!response.ok) {
-        const error = await response.json();
-        throw new Error(error.detail || 'Generation failed');
-    }
 
     const data = await response.json();
     displayGenerateResult(data);
@@ -398,21 +425,12 @@ async function handleIndex() {
     progressText.textContent = `Starting ${mode} indexing...`;
 
     try {
-        const response = await fetch(`${API_BASE_URL}/index`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-                repo_path: path,
-                parallel,
-                incremental,
-                force_full: forceFull
-            })
+        const response = await apiPost('/index', {
+            repo_path: path,
+            parallel,
+            incremental,
+            force_full: forceFull
         });
-
-        if (!response.ok) {
-            const error = await response.json();
-            throw new Error(error.detail || 'Indexing failed');
-        }
 
         const data = await response.json();
         const repoName = data.repo_path;
@@ -502,13 +520,10 @@ function streamIndexingProgress(repoName) {
 // ============================================================================
 async function loadRepositories() {
     try {
-        const response = await fetch(`${API_BASE_URL}/repositories`);
-        if (!response.ok) return;
-
-        const data = await response.json();
+        const data = await apiGet('/repositories');
         const reposList = document.getElementById('reposList');
 
-        if (data.success && data.repositories && data.repositories.length > 0) {
+        if (data?.success && data.repositories?.length > 0) {
             reposList.innerHTML = data.repositories.map(repo => `
                 <div class="repo-card">
                     <div class="repo-info">
@@ -551,16 +566,9 @@ async function loadRepositories() {
 // ============================================================================
 async function viewSymbols(repoName) {
     try {
-        const response = await fetch(`${API_BASE_URL}/symbols/repo/${encodeURIComponent(repoName)}?limit=100`);
+        const data = await apiGet(`/symbols/repo/${encodeURIComponent(repoName)}?limit=100`);
 
-        if (!response.ok) {
-            const error = await response.json();
-            throw new Error(error.detail || 'Failed to load symbols');
-        }
-
-        const data = await response.json();
-
-        if (data.success && data.symbols) {
+        if (data?.success && data.symbols) {
             showSymbolsModal(repoName, data.symbols, data.total_count);
         } else {
             alert('No symbols found for this repository');
@@ -638,15 +646,7 @@ async function deleteRepository(repoName) {
     }
 
     try {
-        const response = await fetch(`${API_BASE_URL}/repositories/${encodeURIComponent(repoName)}`, {
-            method: 'DELETE'
-        });
-
-        if (!response.ok) {
-            const error = await response.json();
-            throw new Error(error.detail || 'Failed to delete repository');
-        }
-
+        const response = await apiDelete(`/repositories/${encodeURIComponent(repoName)}`);
         const data = await response.json();
 
         if (data.success) {
@@ -688,12 +688,8 @@ function formatDate(dateString) {
 // ============================================================================
 async function loadStats() {
     try {
-        const response = await fetch(`${API_BASE_URL}/symbols/stats`);
-        if (!response.ok) return;
-
-        const data = await response.json();
-
-        if (data.success && data.stats) {
+        const data = await apiGet('/symbols/stats');
+        if (data?.success && data.stats) {
             document.getElementById('statSymbols').textContent = data.stats.total_symbols?.toLocaleString() || '0';
             document.getElementById('statRepos').textContent = Object.keys(data.stats.by_repo || {}).length || '0';
             document.getElementById('statFiles').textContent = data.stats.total_files || '0';
@@ -712,13 +708,24 @@ function escapeHtml(text) {
     return div.innerHTML;
 }
 
+function toggleDisplay(elementId, show) {
+    const element = document.getElementById(elementId);
+    if (element) {
+        element.style.display = show ? 'block' : 'none';
+    }
+}
+
+function hideElements(...elementIds) {
+    elementIds.forEach(id => toggleDisplay(id, false));
+}
+
+function showElement(elementId) {
+    toggleDisplay(elementId, true);
+}
+
 // ============================================================================
 // Model Management
 // ============================================================================
-// ============================================================================
-// MODELS MANAGEMENT
-// ============================================================================
-
 let modelsData = [];
 let downloadedModelsCache = [];
 
@@ -729,12 +736,11 @@ async function loadDownloadedModels(noCache = false) {
         const params = new URLSearchParams({ metadata: 'true' });
         if (noCache) params.append('no_cache', 'true');
 
-        const response = await fetch(`/models/downloaded?${params}`);
-        const data = await response.json();
-        downloadedModelsCache = data.models;
-
-        // Update model dropdown
-        updateModelDropdown();
+        const data = await apiGet(`/models/downloaded?${params}`);
+        if (data) {
+            downloadedModelsCache = data.models;
+            updateModelDropdown();
+        }
     } catch (error) {
         console.error('Error loading downloaded models:', error);
     }
@@ -767,25 +773,22 @@ function updateModelDropdown() {
 }
 
 async function loadModels() {
-    const loading = document.getElementById('modelsLoading');
-    const errorDiv = document.getElementById('modelsError');
-
-    loading.style.display = 'block';
-    errorDiv.style.display = 'none';
+    showElement('modelsLoading');
+    hideElements('modelsError');
 
     try {
-        const response = await fetch('/models');
-        const data = await response.json();
-
-        modelsData = data.models;
-        renderModelsTable(modelsData);
-
+        const data = await apiGet('/models');
+        if (data) {
+            modelsData = data.models;
+            renderModelsTable(modelsData);
+        }
     } catch (error) {
         console.error('Error loading models:', error);
+        const errorDiv = document.getElementById('modelsError');
         errorDiv.textContent = `Error loading models: ${error.message}`;
-        errorDiv.style.display = 'block';
+        showElement('modelsError');
     } finally {
-        loading.style.display = 'none';
+        hideElements('modelsLoading');
     }
 }
 
@@ -841,10 +844,7 @@ document.getElementById('downloadSelected').addEventListener('click', async () =
         return;
     }
 
-    const successDiv = document.getElementById('modelsSuccess');
-    const errorDiv = document.getElementById('modelsError');
-    successDiv.style.display = 'none';
-    errorDiv.style.display = 'none';
+    hideElements('modelsSuccess', 'modelsError');
 
     let successCount = 0;
     let errorCount = 0;
@@ -891,24 +891,15 @@ async function deleteModel(modelKey) {
     }
 
     try {
-        const response = await fetch(`${API_BASE_URL}/models/${modelKey}`, {
-            method: 'DELETE'
-        });
+        await apiDelete(`/models/${modelKey}`);
+        showModelsMessage(`Successfully deleted model: ${modelKey}`, 'success');
 
-        const data = await response.json();
-
-        if (response.ok) {
-            showModelsMessage(`Successfully deleted model: ${modelKey}`, 'success');
-
-            // Reload models to update the table
-            setTimeout(() => {
-                loadModels();
-                // Also refresh the downloaded models cache for the dropdown
-                loadDownloadedModels(true);
-            }, 1000);
-        } else {
-            showModelsMessage(`Failed to delete model: ${data.detail || 'Unknown error'}`, 'error');
-        }
+        // Reload models to update the table
+        setTimeout(() => {
+            loadModels();
+            // Also refresh the downloaded models cache for the dropdown
+            loadDownloadedModels(true);
+        }, 1000);
     } catch (error) {
         console.error(`Error deleting model ${modelKey}:`, error);
         showModelsMessage(`Error deleting model: ${error.message}`, 'error');
@@ -946,25 +937,7 @@ document.querySelector('[data-tab="models"]').addEventListener('click', () => {
 // Disabled for local development - uncomment if needed for production
 // setInterval(checkHealth, 30000); // Check every 30 seconds
 
-// ============================================================================
-// Load Statistics
-// ============================================================================
-async function loadStats() {
-    try {
-        const response = await fetch(`${API_BASE_URL}/symbols/stats`);
-        if (!response.ok) return;
 
-        const data = await response.json();
-
-        if (data.success && data.stats) {
-            document.getElementById('statSymbols').textContent = data.stats.total_symbols?.toLocaleString() || '0';
-            document.getElementById('statRepos').textContent = Object.keys(data.stats.by_repo || {}).length || '0';
-            document.getElementById('statFiles').textContent = data.stats.total_files || '0';
-        }
-    } catch (error) {
-        console.error('Failed to load stats:', error);
-    }
-}
 
 // ============================================================================
 // Utility Functions
