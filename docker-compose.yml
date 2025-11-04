@@ -25,23 +25,27 @@ services:
       start_period: 10s
 
   assistant:
-    container_name: assistant
+    # Custom image name (instead of default docker.io/library/my_llm-assistant)
+    image: ai-assistant:latest
+
+    # Custom container name (instead of default my_llm-assistant-1)
+    container_name: ai-assistant
 
     build:
       context: .              # Build context: project root directory
       dockerfile: Dockerfile  # Dockerfile location
 
     # Volume mounts:
-    # 1. C++ source code repositories (read-only)
+    # 1. Source code repositories (read-only)
     #    - Host: ${HOST_REPOS_DIR} from .env (default: ~/src)
     #    - Container: /repos
-    #    - Purpose: Access C++ codebases for analysis
+    #    - Purpose: Access codebases for analysis
     #
     # 2. Persistent data directory (read-write)
-    #    - Host: ./.host_data (project root)
-    #    - Container: /app/host_data
-    #    - Contains: symbol_db.sqlite, faiss_index/, comparisons/, logs
-    #    - Purpose: Persist database, indices, and results
+    #    - Volume: assistant_data (Docker named volume)
+    #    - Container: /app/data
+    #    - Contains: symbol_db.sqlite, faiss_index/, logs
+    #    - Purpose: Persist database, indices, and results across container restarts
     #
     # 3. Source code (read-write, for development)
     #    - Host: ./src (project root)
@@ -51,7 +55,7 @@ services:
 
     volumes:
       - ${HOST_REPOS_DIR:-~/src}:/repos:ro
-      - assistant_data:/app/host_data
+      - assistant_data:/app/data
       - ./src:/app/src:rw
       - ./frontend:/app/frontend:rw
     ports:

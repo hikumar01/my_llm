@@ -1,10 +1,10 @@
 #!/usr/bin/env python3
 """
-Database Operations for C++ Symbol Storage
+Database Operations for code Symbol Storage
 ==========================================
 
 This module provides centralized database management for storing and querying
-C++ symbols extracted from source code. Features include:
+code symbols extracted from source code. Features include:
 
 - Thread-safe connection pooling
 - Optimized batch operations
@@ -112,7 +112,7 @@ def init_database() -> bool:
         db_dir = os.path.dirname(SYMBOL_DB_PATH)
         os.makedirs(db_dir, exist_ok=True)
 
-        print(f"Initializing database at: {SYMBOL_DB_PATH}")
+        print(f"📦 Initializing database at: {SYMBOL_DB_PATH}")
         
         with get_connection() as conn:
             cur = conn.cursor()
@@ -154,7 +154,6 @@ def init_database() -> bool:
             cur.execute('CREATE INDEX IF NOT EXISTS idx_metadata_repo ON file_index_metadata(repo)')
             
             conn.commit()
-            print(f"✅ Database initialized successfully")
             return True
             
     except Exception as e:

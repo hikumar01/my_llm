@@ -281,7 +281,7 @@ class OllamaClient:
 
 def extract_code_blocks(text: str) -> str:
     """
-    Extract C++ code blocks from LLM response.
+    Extract code code blocks from LLM response.
     Handles markdown code blocks (```cpp ... ```) and returns only the code.
     If no code blocks found, returns the original text.
 
