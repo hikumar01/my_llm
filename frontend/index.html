@@ -1,0 +1,279 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AI Assistant</title>
+    <link rel="stylesheet" href="/static/styles.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/github-dark.min.css">
+    <!-- Markdown renderer -->
+    <script src="https://cdn.jsdelivr.net/npm/marked@11.1.1/marked.min.js"></script>
+</head>
+<body>
+    <div class="container">
+        <!-- Header -->
+        <header class="header">
+            <div class="header-content">
+                <h1>🤖 AI Assistant</h1>
+                <p class="subtitle">Multi-Model Code Generation & Analysis</p>
+            </div>
+            <div class="header-actions">
+                <button id="themeToggle" class="btn-icon" title="Toggle theme">
+                    <span class="theme-icon">🌙</span>
+                </button>
+                <div class="status-indicator" id="statusIndicator">
+                    <span class="status-dot"></span>
+                    <span class="status-text">Connecting...</span>
+                </div>
+            </div>
+        </header>
+
+        <!-- Navigation Tabs -->
+        <nav class="tabs">
+            <button class="tab active" data-tab="generate">Generate Code</button>
+            <button class="tab" data-tab="index">Index Repository</button>
+            <button class="tab" data-tab="models">Manage Models</button>
+        </nav>
+
+        <!-- Tab Content -->
+        <main class="content">
+            <!-- Generate Code Tab -->
+            <div id="generate" class="tab-content active">
+                <div class="panel">
+                    <h2>Generate C++ Code</h2>
+                    
+                    <div class="form-group">
+                        <label for="generatePrompt">Prompt</label>
+                        <textarea 
+                            id="generatePrompt" 
+                            class="input-textarea" 
+                            placeholder="Write a C++ function to reverse a string..."
+                            rows="4"></textarea>
+                    </div>
+
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label for="generateModel">Model</label>
+                            <select id="generateModel" class="input-select">
+                                <!-- Populated dynamically from backend -->
+                                <option value="">Loading models...</option>
+                            </select>
+                        </div>
+
+                        <div class="form-group">
+                            <label for="generateMaxTokens">Max Tokens (Output Length)</label>
+                            <select id="generateMaxTokens" class="input-select">
+                                <option value="100">100 - Minimal (Single line or tiny snippet)</option>
+                                <option value="200">200 - Very Short (Small function, 5-10 lines)</option>
+                                <option value="500">500 - Short (Simple function with comments)</option>
+                                <option value="1000">1000 - Medium (Complete function with documentation)</option>
+                                <option value="2000" selected>2000 - Balanced (Multiple functions or class, recommended)</option>
+                                <option value="3000">3000 - Large (Complex class with methods)</option>
+                                <option value="4000">4000 - Very Large (Multiple classes or extensive code)</option>
+                                <option value="6000">6000 - Extensive (Full module with tests)</option>
+                                <option value="8000">8000 - Comprehensive (Complete implementation with docs & tests)</option>
+                            </select>
+                        </div>
+
+                        <div class="form-group">
+                            <label for="generateTemperature">Temperature</label>
+                            <select id="generateTemperature" class="input-select">
+                                <option value="0.0">0.0 - Deterministic (Most consistent, identical outputs)</option>
+                                <option value="0.1">0.1 - Very Low (Highly focused, minimal variation)</option>
+                                <option value="0.2" selected>0.2 - Low (Recommended for C++ - Reliable & consistent)</option>
+                                <option value="0.3">0.3 - Low-Medium (Slight creativity, still predictable)</option>
+                                <option value="0.5">0.5 - Medium (Balanced creativity and consistency)</option>
+                                <option value="0.7">0.7 - Medium-High (More creative variations)</option>
+                                <option value="1.0">1.0 - High (Creative, diverse outputs)</option>
+                                <option value="1.5">1.5 - Very High (Highly creative, experimental)</option>
+                                <option value="2.0">2.0 - Maximum (Most creative, unpredictable)</option>
+                            </select>
+                        </div>
+                    </div>
+
+                    <div class="form-row">
+                        <label class="checkbox-label">
+                            <input type="checkbox" id="generateStream">
+                            <span>🔴 Stream tokens (real-time)</span>
+                        </label>
+                    </div>
+
+                    <button id="generateBtn" class="btn-primary">
+                        <span class="btn-text">Generate Code</span>
+                        <span class="btn-loader" style="display: none;">⏳ Generating...</span>
+                    </button>
+
+                    <!-- Progress indicator for generation -->
+                    <div id="generateProgress" class="progress-container" style="display: none;">
+                        <div class="progress-item">
+                            <span class="progress-model" id="generateProgressModel"></span>
+                            <span class="progress-status">⏳ Generating code...</span>
+                        </div>
+                    </div>
+
+                    <div id="generateResult" class="result-container" style="display: none;">
+                        <div class="result-header">
+                            <h3>Generated Response</h3>
+                            <div class="result-actions">
+                                <button class="btn-secondary btn-sm" id="toggleViewBtn" onclick="toggleResponseView()">📝 Show Code Only</button>
+                                <button class="btn-secondary btn-sm" onclick="copyCode('generateCode')">📋 Copy</button>
+                                <button class="btn-secondary btn-sm" onclick="downloadCode('generateCode', 'generated.cpp')">💾 Download</button>
+                            </div>
+                        </div>
+
+                        <!-- Markdown view (full response with explanations) -->
+                        <div id="generateMarkdown" class="markdown-content"></div>
+
+                        <!-- Code-only view (hidden by default) -->
+                        <pre id="generateCodePre" style="display: none;"><code id="generateCode" class="language-cpp"></code></pre>
+
+                        <div id="generateMetadata" class="metadata-container">
+                            <span class="metadata-item">⏱️ <span id="generateTime">-</span>s</span>
+                            <span class="metadata-item">📏 <span id="generateLength">-</span> chars</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Index Repository Tab -->
+            <div id="index" class="tab-content">
+                <div class="panel">
+                    <h2>Index C++ Repository</h2>
+
+                    <div class="form-group">
+                        <label for="indexPath">Repository Path</label>
+                        <input
+                            type="text"
+                            id="indexPath"
+                            class="input-text"
+                            placeholder="/repos/my-cpp-project">
+                    </div>
+
+                    <div class="form-row">
+                        <label class="checkbox-label">
+                            <input type="checkbox" id="indexParallel" checked>
+                            <span>Parallel processing (faster)</span>
+                        </label>
+                    </div>
+
+                    <div class="form-row">
+                        <label class="checkbox-label">
+                            <input type="checkbox" id="indexIncremental" checked>
+                            <span>Smart incremental indexing (only re-index changed files)</span>
+                        </label>
+                    </div>
+
+                    <div class="form-row">
+                        <label class="checkbox-label">
+                            <input type="checkbox" id="indexForceFull">
+                            <span>Force full re-index (ignore incremental logic)</span>
+                        </label>
+                    </div>
+
+                    <button id="indexBtn" class="btn-primary">
+                        <span class="btn-text">📚 Index Repository</span>
+                        <span class="btn-loader" style="display: none;">⏳ Indexing...</span>
+                    </button>
+
+                    <!-- Progress Bar -->
+                    <div id="indexProgress" class="progress-container" style="display: none;">
+                        <div class="progress-bar">
+                            <div id="indexProgressBar" class="progress-fill" style="width: 0%"></div>
+                        </div>
+                        <div id="indexProgressText" class="progress-text">Starting...</div>
+                    </div>
+
+                    <div id="indexResult" class="result-container" style="display: none;">
+                        <div class="alert alert-success">
+                            <strong>✅ Indexing complete!</strong>
+                            <p id="indexResultMessage"></p>
+                        </div>
+                    </div>
+
+                    <!-- Indexed Repositories List -->
+                    <div class="repos-container" id="reposContainer">
+                        <h3>Indexed Repositories</h3>
+                        <div id="reposList" class="repos-list">
+                            <p class="help-text">No repositories indexed yet</p>
+                        </div>
+                    </div>
+
+                    <!-- Global Statistics -->
+                    <div class="stats-container" id="statsContainer">
+                        <h3>Global Statistics</h3>
+                        <div class="stats-grid" id="statsGrid">
+                            <div class="stat-card">
+                                <div class="stat-value" id="statSymbols">-</div>
+                                <div class="stat-label">Total Symbols</div>
+                            </div>
+                            <div class="stat-card">
+                                <div class="stat-value" id="statRepos">-</div>
+                                <div class="stat-label">Repositories</div>
+                            </div>
+                            <div class="stat-card">
+                                <div class="stat-value" id="statFiles">-</div>
+                                <div class="stat-label">Files Indexed</div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Manage Models Tab -->
+            <div id="models" class="tab-content">
+                <div class="panel">
+                    <h2>Manage Models</h2>
+                    <p class="help-text">Download, remove, and manage your local LLM models</p>
+
+                    <div class="models-actions">
+                        <button id="refreshModels" class="btn btn-secondary">
+                            🔄 Refresh
+                        </button>
+                        <button id="downloadSelected" class="btn btn-primary">
+                            ⬇️ Download Selected
+                        </button>
+                    </div>
+
+                    <div id="modelsLoading" class="loading" style="display: none;">
+                        Loading models...
+                    </div>
+
+                    <div id="modelsTable" class="models-table-container">
+                        <table class="models-table">
+                            <thead>
+                                <tr>
+                                    <th width="40">
+                                        <input type="checkbox" id="selectAll" title="Select all">
+                                    </th>
+                                    <th>Model</th>
+                                    <th>Description</th>
+                                    <th>Size</th>
+                                    <th>License</th>
+                                    <th width="100">Status</th>
+                                    <th width="80">Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody id="modelsTableBody">
+                                <!-- Models will be populated here -->
+                            </tbody>
+                        </table>
+                    </div>
+
+                    <div id="modelsError" class="alert alert-error" style="display: none;"></div>
+                    <div id="modelsSuccess" class="alert alert-success" style="display: none;"></div>
+                </div>
+            </div>
+        </main>
+
+        <!-- Footer -->
+        <footer class="footer">
+            <p>C++ AI Assistant • Powered by Local LLM Models • <a href="/docs" target="_blank">API Docs</a></p>
+        </footer>
+    </div>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/languages/cpp.min.js"></script>
+    <script src="/static/app.js"></script>
+</body>
+</html>
+
