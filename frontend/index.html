@@ -8,137 +8,166 @@
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/github-dark.min.css">
     <!-- Markdown renderer -->
     <script src="https://cdn.jsdelivr.net/npm/marked@11.1.1/marked.min.js"></script>
+    <!-- Mermaid for diagrams and flowcharts -->
+    <script src="https://cdn.jsdelivr.net/npm/mermaid@10.6.1/dist/mermaid.min.js"></script>
 </head>
 <body>
     <div class="container">
         <!-- Header -->
         <header class="header">
-            <div class="header-content">
+            <div class="header-content clickable" id="headerTitle" title="Click to go to AI Assistant">
                 <h1>🤖 AI Assistant</h1>
-                <p class="subtitle">Multi-Model Code Generation & Analysis</p>
             </div>
             <div class="header-actions">
+                <div class="status-indicator" id="statusIndicator">
+                    <span class="status-icon">⏳</span>
+                    <span class="status-text">Connecting...</span>
+                </div>
+                <button id="indexRepoBtn" class="btn-icon" title="Index Repository (Click to index your codebase)">
+                    <span class="index-icon">📁</span>
+                </button>
                 <button id="themeToggle" class="btn-icon" title="Toggle theme">
                     <span class="theme-icon">🌙</span>
                 </button>
-                <div class="status-indicator" id="statusIndicator">
-                    <span class="status-dot"></span>
-                    <span class="status-text">Connecting...</span>
-                </div>
             </div>
         </header>
 
-        <!-- Navigation Tabs -->
-        <nav class="tabs">
-            <button class="tab active" data-tab="generate">Generate Code</button>
-            <button class="tab" data-tab="index">Index Repository</button>
-            <button class="tab" data-tab="models">Manage Models</button>
-        </nav>
-
         <!-- Tab Content -->
         <main class="content">
-            <!-- Generate Code Tab -->
-            <div id="generate" class="tab-content active">
+            <!-- AI Assistant Tab -->
+            <div id="assistant" class="tab-content active">
                 <div class="panel">
-                    <h2>Generate Code</h2>
-
+                    <!-- Main Prompt Area -->
                     <div class="form-group">
-                        <label for="generatePrompt">Prompt</label>
                         <textarea
-                            id="generatePrompt"
-                            class="input-textarea"
-                            placeholder="Write a function to reverse a string..."
-                            rows="4"></textarea>
+                            id="assistantPrompt"
+                            class="input-textarea large-prompt"
+                            placeholder="What would you like me to help you with?"
+                            rows="6"></textarea>
                     </div>
 
-                    <div class="form-row">
-                        <div class="form-group">
-                            <label for="generateModel">Model</label>
-                            <select id="generateModel" class="input-select">
-                                <!-- Populated dynamically from backend -->
-                                <option value="">Loading models...</option>
-                            </select>
-                        </div>
-
-                        <div class="form-group">
-                            <label for="generateMaxTokens">Max Tokens (Output Length)</label>
-                            <select id="generateMaxTokens" class="input-select">
-                                <option value="100">100 - Minimal (Single line or tiny snippet)</option>
-                                <option value="200">200 - Very Short (Small function, 5-10 lines)</option>
-                                <option value="500">500 - Short (Simple function with comments)</option>
-                                <option value="1000">1000 - Medium (Complete function with documentation)</option>
-                                <option value="2000" selected>2000 - Balanced (Multiple functions or class, recommended)</option>
-                                <option value="3000">3000 - Large (Complex class with methods)</option>
-                                <option value="4000">4000 - Very Large (Multiple classes or extensive code)</option>
-                                <option value="6000">6000 - Extensive (Full module with tests)</option>
-                                <option value="8000">8000 - Comprehensive (Complete implementation with docs & tests)</option>
-                            </select>
-                        </div>
-
-                        <div class="form-group">
-                            <label for="generateTemperature">Temperature</label>
-                            <select id="generateTemperature" class="input-select">
-                                <option value="0.0">0.0 - Deterministic (Most consistent, identical outputs)</option>
-                                <option value="0.1">0.1 - Very Low (Highly focused, minimal variation)</option>
-                                <option value="0.2" selected>0.2 - Low (Recommended - Reliable & consistent)</option>
-                                <option value="0.3">0.3 - Low-Medium (Slight creativity, still predictable)</option>
-                                <option value="0.5">0.5 - Medium (Balanced creativity and consistency)</option>
-                                <option value="0.7">0.7 - Medium-High (More creative variations)</option>
-                                <option value="1.0">1.0 - High (Creative, diverse outputs)</option>
-                                <option value="1.5">1.5 - Very High (Highly creative, experimental)</option>
-                                <option value="2.0">2.0 - Maximum (Most creative, unpredictable)</option>
-                            </select>
-                        </div>
+                    <!-- Task Type Selector -->
+                    <div class="task-type-selector">
+                        <button class="task-type-btn active" data-task="code">Code</button>
+                        <button class="task-type-btn" data-task="text">Text</button>
+                        <button class="task-type-btn" data-task="ppt">PPT</button>
                     </div>
 
-                    <div class="form-row">
-                        <label class="checkbox-label">
-                            <input type="checkbox" id="generateStream">
-                            <span>🔴 Stream tokens (real-time)</span>
-                        </label>
-                    </div>
-
-                    <button id="generateBtn" class="btn-primary">
-                        <span class="btn-text">Generate Code</span>
-                        <span class="btn-loader" style="display: none;">⏳ Generating...</span>
-                    </button>
-
-                    <!-- Progress indicator for generation -->
-                    <div id="generateProgress" class="progress-container" style="display: none;">
-                        <div class="progress-item">
-                            <span class="progress-model" id="generateProgressModel"></span>
-                            <span class="progress-status">⏳ Generating code...</span>
-                        </div>
-                    </div>
-
-                    <div id="generateResult" class="result-container" style="display: none;">
-                        <div class="result-header">
-                            <h3>Generated Response</h3>
-                            <div class="result-actions">
-                                <button class="btn-secondary btn-sm" id="toggleViewBtn" onclick="toggleResponseView()">📝 Show Code Only</button>
-                                <button class="btn-secondary btn-sm" onclick="copyCode('generateCode')">📋 Copy</button>
-                                <button class="btn-secondary btn-sm" onclick="downloadCode('generateCode', 'generated.cpp')">💾 Download</button>
+                    <!-- Configuration Panel (appears when task type is selected) -->
+                    <div id="configPanel" class="config-panel">
+                        <!-- Code Configuration -->
+                        <div id="codeConfig" class="task-config active">
+                            <div class="config-row">
+                                <div class="config-item">
+                                    <label>Max Tokens</label>
+                                    <select id="codeMaxTokens" class="input-select-xs">
+                                        <option value="500">500</option>
+                                        <option value="1000">1000</option>
+                                        <option value="2000" selected>2000 ⭐</option>
+                                        <option value="4000">4000</option>
+                                        <option value="8000">8000</option>
+                                    </select>
+                                </div>
+                                <div class="config-item">
+                                    <label>Temperature</label>
+                                    <select id="codeTemperature" class="input-select-xs">
+                                        <option value="0.0">0.0</option>
+                                        <option value="0.2" selected>0.2 ⭐</option>
+                                        <option value="0.5">0.5</option>
+                                        <option value="0.7">0.7</option>
+                                        <option value="1.0">1.0</option>
+                                    </select>
+                                </div>
                             </div>
                         </div>
 
-                        <!-- Markdown view (full response with explanations) -->
-                        <div id="generateMarkdown" class="markdown-content"></div>
+                        <!-- Text Configuration -->
+                        <div id="textConfig" class="task-config">
+                            <div class="config-row">
+                                <div class="config-item">
+                                    <label>Style</label>
+                                    <select id="textStyle" class="input-select-xs">
+                                        <option value="professional" selected>Professional ⭐</option>
+                                        <option value="formal">Formal</option>
+                                        <option value="casual">Casual</option>
+                                        <option value="creative">Creative</option>
+                                    </select>
+                                </div>
+                                <div class="config-item">
+                                    <label>Max Tokens</label>
+                                    <select id="textMaxTokens" class="input-select-xs">
+                                        <option value="500">500</option>
+                                        <option value="1000" selected>1000 ⭐</option>
+                                        <option value="2000">2000</option>
+                                        <option value="4000">4000</option>
+                                    </select>
+                                </div>
+                            </div>
+                        </div>
 
-                        <!-- Code-only view (hidden by default) -->
-                        <pre id="generateCodePre" style="display: none;"><code id="generateCode" class="language-cpp"></code></pre>
+                        <!-- PPT Configuration -->
+                        <div id="pptConfig" class="task-config">
+                            <div class="config-row">
+                                <div class="config-item">
+                                    <label>Output Type</label>
+                                    <select id="pptOutputType" class="input-select-xs">
+                                        <option value="content" selected>Content ⭐</option>
+                                        <option value="workflow">Workflow</option>
+                                        <option value="both">Both</option>
+                                    </select>
+                                </div>
+                                <div class="config-item">
+                                    <label>Max Tokens</label>
+                                    <select id="pptMaxTokens" class="input-select-xs">
+                                        <option value="1000">1000</option>
+                                        <option value="2000" selected>2000 ⭐</option>
+                                        <option value="4000">4000</option>
+                                        <option value="6000">6000</option>
+                                    </select>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
 
-                        <div id="generateMetadata" class="metadata-container">
-                            <span class="metadata-item">⏱️ <span id="generateTime">-</span>s</span>
-                            <span class="metadata-item">📏 <span id="generateLength">-</span> chars</span>
+                    <!-- Submit Button -->
+                    <button id="assistantSubmitBtn" class="btn-primary btn-large">
+                        ✨ Submit
+                    </button>
+
+                    <!-- Progress indicator -->
+                    <div id="assistantProgress" class="progress-container" style="display: none;">
+                        <div class="progress-item">
+                            <span class="progress-model" id="assistantProgressModel"></span>
+                            <span class="progress-status">⏳ Generating...</span>
+                        </div>
+                    </div>
+
+                    <!-- Result -->
+                    <div id="assistantResult" class="result-container" style="display: none;">
+                        <div class="result-header">
+                            <h3>✨ Result</h3>
+                            <div class="result-actions">
+                                <button class="btn-secondary btn-sm" onclick="copyAssistantResult()">📋 Copy</button>
+                                <button class="btn-secondary btn-sm" onclick="downloadAssistantResult()">💾 Download</button>
+                            </div>
+                        </div>
+
+                        <div id="assistantMarkdown" class="markdown-content"></div>
+
+                        <div id="assistantMetadata" class="metadata-container">
+                            <span class="metadata-item">🤖 <span id="assistantModel">-</span></span>
+                            <span class="metadata-item">⏱️ <span id="assistantTime">-</span>s</span>
+                            <span class="metadata-item">📏 <span id="assistantLength">-</span> chars</span>
                         </div>
                     </div>
                 </div>
             </div>
+
 
             <!-- Index Repository Tab -->
             <div id="index" class="tab-content">
                 <div class="panel">
-                    <h2>Index Repository</h2>
+                    <h2>📁 Index Repository</h2>
 
                     <div class="form-group">
                         <label for="indexPath">Repository Path</label>
@@ -152,21 +181,21 @@
                     <div class="form-row">
                         <label class="checkbox-label">
                             <input type="checkbox" id="indexParallel" checked>
-                            <span>Parallel processing (faster)</span>
+                            <span>⚡ Parallel processing</span>
                         </label>
                     </div>
 
                     <div class="form-row">
                         <label class="checkbox-label">
                             <input type="checkbox" id="indexIncremental" checked>
-                            <span>Smart incremental indexing (only re-index changed files)</span>
+                            <span>🔄 Smart incremental indexing</span>
                         </label>
                     </div>
 
                     <div class="form-row">
                         <label class="checkbox-label">
                             <input type="checkbox" id="indexForceFull">
-                            <span>Force full re-index (ignore incremental logic)</span>
+                            <span>🔥 Force full re-index</span>
                         </label>
                     </div>
 
@@ -222,12 +251,41 @@
             <!-- Manage Models Tab -->
             <div id="models" class="tab-content">
                 <div class="panel">
-                    <h2>Manage Models</h2>
-                    <p class="help-text">Download, remove, and manage your local LLM models</p>
+                    <h2>🤖 Manage Models</h2>
+                    <p class="help-text">Download and manage local LLM models</p>
+
+                    <!-- Recommended Setup Info Box -->
+                    <div class="info-box" style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; padding: 20px; border-radius: 12px; margin-bottom: 20px;">
+                        <h3 style="margin: 0 0 10px 0; font-size: 1.2rem;">💡 Recommended Setup</h3>
+                        <p style="margin: 0 0 15px 0; opacity: 0.95;">Download these 3 models for best results:</p>
+                        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 15px; margin-bottom: 15px;">
+                            <div style="background: rgba(255,255,255,0.15); padding: 12px; border-radius: 8px;">
+                                <div style="font-weight: 600; margin-bottom: 5px;">💻 DeepSeek Coder 6.7B</div>
+                                <div style="font-size: 0.9rem; opacity: 0.9;">Code Generation</div>
+                                <div style="font-size: 0.85rem; opacity: 0.8;">3.8 GB | ⭐⭐⭐⭐⭐</div>
+                            </div>
+                            <div style="background: rgba(255,255,255,0.15); padding: 12px; border-radius: 8px;">
+                                <div style="font-weight: 600; margin-bottom: 5px;">🎨 Qwen 2.5 Coder 7B</div>
+                                <div style="font-size: 0.9rem; opacity: 0.9;">Workflow Diagrams</div>
+                                <div style="font-size: 0.85rem; opacity: 0.8;">4.7 GB | ⭐⭐⭐⭐⭐</div>
+                            </div>
+                            <div style="background: rgba(255,255,255,0.15); padding: 12px; border-radius: 8px;">
+                                <div style="font-weight: 600; margin-bottom: 5px;">📊 Llama 3.2 3B</div>
+                                <div style="font-size: 0.9rem; opacity: 0.9;">Text Enhancement</div>
+                                <div style="font-size: 0.85rem; opacity: 0.8;">2.0 GB | ⭐⭐⭐⭐</div>
+                            </div>
+                        </div>
+                        <div style="font-size: 0.9rem; opacity: 0.9;">
+                            <strong>Total:</strong> ~10.5 GB | <strong>RAM:</strong> 8-12 GB | <strong>Speed:</strong> 2-3s
+                        </div>
+                    </div>
 
                     <div class="models-actions">
                         <button id="refreshModels" class="btn btn-secondary">
                             🔄 Refresh
+                        </button>
+                        <button id="downloadRecommended" class="btn btn-primary" style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);">
+                            ⭐ Download Recommended (3 models)
                         </button>
                         <button id="downloadSelected" class="btn btn-primary">
                             ⬇️ Download Selected
@@ -247,8 +305,9 @@
                                     </th>
                                     <th>Model</th>
                                     <th>Description</th>
+                                    <th>Best For</th>
                                     <th>Size</th>
-                                    <th>License</th>
+                                    <th>Performance</th>
                                     <th width="100">Status</th>
                                     <th width="80">Actions</th>
                                 </tr>

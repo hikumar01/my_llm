@@ -82,12 +82,48 @@ class IndexRepoRequest(BaseModel):
     incremental: bool = Field(default=True, description="Use smart incremental indexing (only re-index changed files)")
     force_full: bool = Field(default=False, description="Force full re-index (ignore incremental logic)")
 
+class TextEnhancementRequest(BaseModel):
+    """Request schema for professional text enhancement."""
+    text: str = Field(..., description="Text to enhance", min_length=1)
+    style: str = Field(default="professional", description="Enhancement style: professional, formal, casual, creative")
+    model: str = Field(default_factory=get_default_model_key, description="Model to use")
+    options: Optional[Dict[str, bool]] = Field(default=None, description="Enhancement options (grammar, clarity, tone, etc.)")
+
+class TextEnhancementResponse(BaseModel):
+    """Response schema for text enhancement."""
+    success: bool
+    original: str
+    enhanced: str
+    suggestions: Optional[List[str]] = None
+    model: str
+    generation_time: float
+    error: Optional[str] = None
+
 class HealthResponse(BaseModel):
     """Health check response."""
     status: str
     ollama_available: bool
     database_stats: Dict[str, Any]
     available_models: List[str]
+
+class AssistantRequest(BaseModel):
+    """Request schema for unified AI assistant."""
+    prompt: str = Field(..., description="The user prompt", min_length=1)
+    task_type: str = Field(..., description="Task type: code, text, or ppt")
+    max_tokens: int = Field(default=2000, ge=100, le=8000, description="Maximum tokens to generate")
+    temperature: Optional[float] = Field(default=None, description="Sampling temperature (optional)")
+    stream: bool = Field(default=True, description="Stream response")
+    style: Optional[str] = Field(default=None, description="Text enhancement style (for text tasks)")
+    output_type: Optional[str] = Field(default=None, description="PPT output type (for ppt tasks)")
+
+class AssistantResponse(BaseModel):
+    """Response schema for unified AI assistant."""
+    success: bool
+    model: str
+    response: str
+    task_type: str
+    generation_time: float
+    error: Optional[str] = None
 
 # ============================================================================
 # FASTAPI APP INITIALIZATION
@@ -136,6 +172,8 @@ Browse the endpoints below for detailed documentation and schemas.
         {"name": "Frontend", "description": "Serve frontend HTML and static files"},
         {"name": "Health & Status", "description": "Health check and system status"},
         {"name": "Model Management", "description": "Download, list, and delete LLM models"},
+        {"name": "AI Assistant", "description": "Unified AI assistant for code, text, and presentations"},
+        {"name": "Text Enhancement", "description": "Enhance and polish text professionally"},
         {"name": "Code Generation", "description": "Generate code using LLM models"},
         {"name": "Symbol Search", "description": "Search indexed symbols and statistics"},
         {"name": "Repository Management", "description": "List and delete indexed repositories"},
@@ -179,8 +217,8 @@ async def startup_event():
     loaded_models = get_installed_models()
 
     print("\n📦 Model Configuration:")
-    print(f"   Ollama URL: {OLLAMA_URL}")
-    print(f"   Model storage: ./.llm_models")
+    print(f"📦 Ollama URL: {OLLAMA_URL}")
+    print(f"📦 Model storage: ./.llm_models")
     print(f"\n📦 Loaded models: {loaded_models if loaded_models else 'None (download via UI)'}")
     print("="*60 + "\n")
 
@@ -237,8 +275,8 @@ async def health_check():
         # Get database stats
         db_stats = get_database_stats()
 
-        # Get available models
-        available_models = list(AVAILABLE_LOCAL_MODELS.keys())
+        # Get downloaded models (not all available models)
+        available_models = get_downloaded_models()
 
         return HealthResponse(
             status="healthy" if ollama_available else "degraded",
@@ -396,11 +434,540 @@ async def delete_model(model_key: str):
 
 
 # ============================================================================
-# INTELLIGENT MODEL SELECTION ENDPOINTS
+# TEXT ENHANCEMENT ENDPOINTS
 # ============================================================================
 
+@app.post(
+    "/enhance/text",
+    response_model=TextEnhancementResponse,
+    tags=["Text Enhancement"],
+    summary="Enhance Text Professionally",
+    description="""Enhance casual or rough text to professional, polished versions.
+
+Used for improving emails, posts, documentation, or any text that needs professional polish.
+Supports different styles: professional, formal, casual, creative.
+    """
+)
+async def enhance_text(request: TextEnhancementRequest):
+    """
+    Enhance text to make it more professional and polished.
+
+    Example:
+        POST /enhance/text
+        {
+            "text": "hey can u send me the report asap thx",
+            "style": "professional",
+            "model": "qwen2.5-coder"
+        }
+
+    Response:
+        {
+            "success": true,
+            "original": "hey can u send me the report asap thx",
+            "enhanced": "Hello,\n\nCould you please send me the report at your earliest convenience?\n\nThank you.",
+            "suggestions": ["Consider adding a subject line", "Add recipient name for personalization"],
+            "model": "qwen2.5-coder",
+            "generation_time": 2.3
+        }
+    """
+    try:
+        # Validate model exists
+        if request.model not in AVAILABLE_LOCAL_MODELS:
+            raise HTTPException(
+                status_code=400,
+                detail=f"Invalid model. Available: {list(AVAILABLE_LOCAL_MODELS.keys())}"
+            )
+
+        # Check if model is downloaded
+        downloaded = get_downloaded_models()
+        if request.model not in downloaded:
+            raise HTTPException(
+                status_code=400,
+                detail=f"Model '{request.model}' is not downloaded. Please download it first from the Manage Models tab."
+            )
+
+        # Build enhancement prompt based on style
+        style_prompts = {
+            "professional": "Rewrite the following text in a professional, polished manner suitable for business communication. Maintain the core message but improve grammar, clarity, and tone.",
+            "formal": "Rewrite the following text in a formal, academic style suitable for official documents or scholarly communication. Use formal language and proper structure.",
+            "casual": "Rewrite the following text in a friendly, casual tone while keeping it clear and appropriate. Make it conversational but not unprofessional.",
+            "creative": "Rewrite the following text in a creative, engaging manner. Make it interesting and compelling while maintaining clarity."
+        }
+
+        style_instruction = style_prompts.get(request.style, style_prompts["professional"])
+
+        # Add specific enhancement options if provided
+        options_text = ""
+        if request.options:
+            enhancements = []
+            if request.options.get("grammar", True):
+                enhancements.append("Fix any grammar and spelling errors")
+            if request.options.get("clarity", True):
+                enhancements.append("Improve clarity and readability")
+            if request.options.get("tone", True):
+                enhancements.append("Adjust tone to be appropriate")
+            if request.options.get("concise", False):
+                enhancements.append("Make it more concise")
+            if request.options.get("detailed", False):
+                enhancements.append("Add more detail and context")
+
+            if enhancements:
+                options_text = "\n\nSpecific improvements:\n- " + "\n- ".join(enhancements)
+
+        full_prompt = f"""{style_instruction}{options_text}
+
+Original text:
+\"\"\"
+{request.text}
+\"\"\"
+
+Provide:
+1. The enhanced version of the text
+2. A brief list of key improvements made (2-3 bullet points)
+
+Format your response as:
+ENHANCED TEXT:
+[your enhanced version here]
+
+KEY IMPROVEMENTS:
+- [improvement 1]
+- [improvement 2]
+- [improvement 3]
+"""
+
+        # Generate enhancement
+        client = OllamaClient(AVAILABLE_LOCAL_MODELS[request.model]["name"])
+
+        start_time = time.time()
+        raw_response = client.generate(
+            full_prompt,
+            max_tokens=2000,
+            temperature=0.3  # Slightly higher for more natural language
+        )
+        generation_time = time.time() - start_time
+
+        if not raw_response:
+            return TextEnhancementResponse(
+                success=False,
+                original=request.text,
+                enhanced="",
+                model=request.model,
+                generation_time=generation_time,
+                error="Model failed to generate enhancement"
+            )
+
+        # Parse response to extract enhanced text and suggestions
+        enhanced_text = ""
+        suggestions = []
+
+        try:
+            # Split response into sections
+            if "ENHANCED TEXT:" in raw_response:
+                parts = raw_response.split("ENHANCED TEXT:")
+                if len(parts) > 1:
+                    enhanced_section = parts[1].split("KEY IMPROVEMENTS:")[0].strip()
+                    enhanced_text = enhanced_section.strip('"').strip()
+
+                    # Extract suggestions
+                    if "KEY IMPROVEMENTS:" in raw_response:
+                        improvements_section = raw_response.split("KEY IMPROVEMENTS:")[1]
+                        # Extract bullet points
+                        for line in improvements_section.split('\n'):
+                            line = line.strip()
+                            if line.startswith('-') or line.startswith('•'):
+                                suggestions.append(line.lstrip('-•').strip())
+            else:
+                # Fallback: use entire response as enhanced text
+                enhanced_text = raw_response.strip()
+        except Exception:
+            # If parsing fails, use raw response
+            enhanced_text = raw_response.strip()
+
+        return TextEnhancementResponse(
+            success=True,
+            original=request.text,
+            enhanced=enhanced_text,
+            suggestions=suggestions if suggestions else None,
+            model=request.model,
+            generation_time=generation_time
+        )
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Text enhancement failed: {str(e)}")
+
+
+@app.post(
+    "/enhance/text/stream",
+    tags=["Text Enhancement"],
+    summary="Enhance Text (Streaming)",
+    description="""Enhance text with real-time streaming using Server-Sent Events (SSE).
+
+Provides real-time feedback as the enhanced text is generated.
+    """
+)
+async def enhance_text_stream(request: TextEnhancementRequest):
+    """
+    Enhance text with streaming enabled.
+    Returns Server-Sent Events (SSE) stream of tokens as they're generated.
+    """
+    try:
+        # Validate model exists
+        if request.model not in AVAILABLE_LOCAL_MODELS:
+            raise HTTPException(
+                status_code=400,
+                detail=f"Invalid model. Available: {list(AVAILABLE_LOCAL_MODELS.keys())}"
+            )
+
+        # Check if model is downloaded
+        downloaded = get_downloaded_models()
+        if request.model not in downloaded:
+            raise HTTPException(
+                status_code=400,
+                detail=f"Model '{request.model}' is not downloaded. Please download it first from the Manage Models tab."
+            )
+
+        # Build enhancement prompt (same as non-streaming)
+        style_prompts = {
+            "professional": "Rewrite the following text in a professional, polished manner suitable for business communication. Maintain the core message but improve grammar, clarity, and tone.",
+            "formal": "Rewrite the following text in a formal, academic style suitable for official documents or scholarly communication. Use formal language and proper structure.",
+            "casual": "Rewrite the following text in a friendly, casual tone while keeping it clear and appropriate. Make it conversational but not unprofessional.",
+            "creative": "Rewrite the following text in a creative, engaging manner. Make it interesting and compelling while maintaining clarity."
+        }
+
+        style_instruction = style_prompts.get(request.style, style_prompts["professional"])
+
+        full_prompt = f"""{style_instruction}
+
+Original text:
+\"\"\"
+{request.text}
+\"\"\"
+
+Provide the enhanced version:
+"""
+
+        # Get model info
+        model_info = AVAILABLE_LOCAL_MODELS[request.model]
+        model_name = model_info["name"]
+
+        # Create client
+        client = OllamaClient(model_name)
+
+        # Generator function for SSE
+        async def event_generator():
+            """Generate Server-Sent Events from the streaming response."""
+            start_time = time.time()
+            full_response = ""
+
+            try:
+                # Send initial event
+                yield f"data: {json.dumps({'status': 'started', 'model': request.model})}\n\n"
+
+                # Stream tokens from Ollama
+                for chunk in client.generate_stream(
+                    full_prompt,
+                    max_tokens=2000,
+                    temperature=0.3
+                ):
+                    # Check for errors
+                    if "error" in chunk:
+                        yield f"data: {json.dumps({'error': chunk['error'], 'done': True})}\n\n"
+                        return
+
+                    # Send token if present
+                    if "response" in chunk:
+                        token = chunk["response"]
+                        full_response += token
+                        yield f"data: {json.dumps({'token': token, 'done': False})}\n\n"
+
+                    # Check if done
+                    if chunk.get("done", False):
+                        elapsed_time = time.time() - start_time
+
+                        # Send completion event with metadata
+                        completion_data = {
+                            "done": True,
+                            "total_time": elapsed_time,
+                            "model": request.model,
+                            "response": full_response,
+                            "original": request.text
+                        }
+                        yield f"data: {json.dumps(completion_data)}\n\n"
+                        return
+
+            except Exception as e:
+                yield f"data: {json.dumps({'error': str(e), 'done': True})}\n\n"
+
+        # Return streaming response
+        return StreamingResponse(
+            event_generator(),
+            media_type="text/event-stream",
+            headers={
+                "Cache-Control": "no-cache",
+                "Connection": "keep-alive",
+                "X-Accel-Buffering": "no",
+                "Transfer-Encoding": "chunked"
+            }
+        )
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
 # ============================================================================
-# CODE GENERATION ENDPOINTS
+# UNIFIED AI ASSISTANT ENDPOINTS
+# ============================================================================
+
+def select_model_for_task(task_type: str, config: dict) -> str:
+    """
+    Intelligently select the best model based on task type and configuration.
+
+    Args:
+        task_type: 'code', 'text', or 'ppt'
+        config: Configuration dictionary with task-specific settings
+
+    Returns:
+        Model key to use
+    """
+    downloaded_models = get_downloaded_models()
+
+    if not downloaded_models:
+        raise HTTPException(status_code=503, detail="No models available. Please download a model first.")
+
+    # Define preferred model KEYS for each task type (not full names)
+    # These are the keys from AVAILABLE_LOCAL_MODELS
+    task_preferences = {
+        'code': ['deepseek-coder', 'qwen2.5-coder', 'codellama'],
+        'text': ['llama3.2', 'qwen2.5-coder', 'deepseek-coder'],
+        'ppt': ['qwen2.5-coder', 'deepseek-coder', 'llama3.2']
+    }
+
+    preferences = task_preferences.get(task_type, task_preferences['code'])
+
+    # Try to find the first preferred model that's downloaded
+    for preferred in preferences:
+        if preferred in downloaded_models:
+            return preferred
+
+    # Fallback to first available model
+    return downloaded_models[0]
+
+
+@app.post(
+    "/assistant/generate",
+    response_model=AssistantResponse,
+    tags=["AI Assistant"],
+    summary="Unified AI Assistant (Non-Streaming)",
+    description="""Generate responses using the unified AI assistant interface.
+
+    Supports three task types:
+    - **code**: Code generation and programming tasks
+    - **text**: Text enhancement and writing tasks
+    - **ppt**: Presentation content and structured output
+
+    The backend automatically selects the best model based on task type.
+    """
+)
+async def assistant_generate(request: AssistantRequest):
+    """
+    Unified AI assistant endpoint - handles code, text, and PPT generation.
+    """
+    try:
+        # Select appropriate model KEY based on task type
+        model_key = select_model_for_task(request.task_type, {
+            'style': request.style,
+            'output_type': request.output_type
+        })
+
+        # Convert model key to full name
+        if model_key not in AVAILABLE_LOCAL_MODELS:
+            raise HTTPException(status_code=500, detail=f"Invalid model key: {model_key}")
+
+        model_full_name = AVAILABLE_LOCAL_MODELS[model_key]["name"]
+
+        # Build task-specific prompt
+        if request.task_type == 'code':
+            temperature = request.temperature if request.temperature is not None else 0.2
+            system_prompt = "You are an expert programmer. Generate clean, efficient, well-documented code."
+            full_prompt = f"{system_prompt}\n\n{request.prompt}"
+
+        elif request.task_type == 'text':
+            temperature = request.temperature if request.temperature is not None else 0.7
+            style = request.style or 'professional'
+            system_prompt = f"You are a professional writer. Enhance the following text in a {style} style."
+            full_prompt = f"{system_prompt}\n\n{request.prompt}"
+
+        elif request.task_type == 'ppt':
+            temperature = request.temperature if request.temperature is not None else 0.5
+            output_type = request.output_type or 'content'
+            if output_type == 'workflow':
+                system_prompt = """You are a presentation expert. Create a structured workflow/outline for a presentation.
+When appropriate, include Mermaid diagrams using ```mermaid code blocks for flowcharts, timelines, or process flows.
+Use Mermaid syntax: flowchart TD, sequenceDiagram, stateDiagram, etc."""
+            elif output_type == 'both':
+                system_prompt = """You are a presentation expert. Create both content and workflow for a presentation.
+When appropriate, include Mermaid diagrams using ```mermaid code blocks for flowcharts, timelines, or process flows.
+Use Mermaid syntax: flowchart TD, sequenceDiagram, stateDiagram, etc."""
+            else:
+                system_prompt = """You are a presentation expert. Create engaging presentation content.
+When appropriate, include Mermaid diagrams using ```mermaid code blocks for flowcharts, timelines, or process flows.
+Use Mermaid syntax: flowchart TD, sequenceDiagram, stateDiagram, etc."""
+            full_prompt = f"{system_prompt}\n\n{request.prompt}"
+        else:
+            raise HTTPException(status_code=400, detail=f"Invalid task type: {request.task_type}")
+
+        # Generate response
+        start_time = time.time()
+        client = OllamaClient(model=model_full_name)
+
+        raw_response = client.generate(
+            prompt=full_prompt,
+            max_tokens=request.max_tokens,
+            temperature=temperature
+        )
+
+        generation_time = time.time() - start_time
+
+        if not raw_response:
+            return AssistantResponse(
+                success=False,
+                model=model_full_name,
+                response="",
+                task_type=request.task_type,
+                generation_time=generation_time,
+                error="Model failed to generate response"
+            )
+
+        return AssistantResponse(
+            success=True,
+            model=model_full_name,
+            response=raw_response,
+            task_type=request.task_type,
+            generation_time=generation_time
+        )
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Assistant generation failed: {str(e)}")
+
+
+@app.post(
+    "/assistant/generate/stream",
+    tags=["AI Assistant"],
+    summary="Unified AI Assistant (Streaming)",
+    description="""Generate responses with real-time streaming using Server-Sent Events (SSE).
+
+    Provides real-time feedback as the response is generated for any task type.
+    """
+)
+async def assistant_generate_stream(request: AssistantRequest):
+    """
+    Unified AI assistant endpoint with streaming - handles code, text, and PPT generation.
+    """
+    try:
+        # Select appropriate model KEY based on task type
+        model_key = select_model_for_task(request.task_type, {
+            'style': request.style,
+            'output_type': request.output_type
+        })
+
+        # Convert model key to full name
+        if model_key not in AVAILABLE_LOCAL_MODELS:
+            raise HTTPException(status_code=500, detail=f"Invalid model key: {model_key}")
+
+        model_full_name = AVAILABLE_LOCAL_MODELS[model_key]["name"]
+
+        # Build task-specific prompt (same logic as non-streaming)
+        if request.task_type == 'code':
+            temperature = request.temperature if request.temperature is not None else 0.2
+            system_prompt = "You are an expert programmer. Generate clean, efficient, well-documented code."
+            full_prompt = f"{system_prompt}\n\n{request.prompt}"
+
+        elif request.task_type == 'text':
+            temperature = request.temperature if request.temperature is not None else 0.7
+            style = request.style or 'professional'
+            system_prompt = f"You are a professional writer. Enhance the following text in a {style} style."
+            full_prompt = f"{system_prompt}\n\n{request.prompt}"
+
+        elif request.task_type == 'ppt':
+            temperature = request.temperature if request.temperature is not None else 0.5
+            output_type = request.output_type or 'content'
+            if output_type == 'workflow':
+                system_prompt = """You are a presentation expert. Create a structured workflow/outline for a presentation.
+When appropriate, include Mermaid diagrams using ```mermaid code blocks for flowcharts, timelines, or process flows.
+Use Mermaid syntax: flowchart TD, sequenceDiagram, stateDiagram, etc."""
+            elif output_type == 'both':
+                system_prompt = """You are a presentation expert. Create both content and workflow for a presentation.
+When appropriate, include Mermaid diagrams using ```mermaid code blocks for flowcharts, timelines, or process flows.
+Use Mermaid syntax: flowchart TD, sequenceDiagram, stateDiagram, etc."""
+            else:
+                system_prompt = """You are a presentation expert. Create engaging presentation content.
+When appropriate, include Mermaid diagrams using ```mermaid code blocks for flowcharts, timelines, or process flows.
+Use Mermaid syntax: flowchart TD, sequenceDiagram, stateDiagram, etc."""
+            full_prompt = f"{system_prompt}\n\n{request.prompt}"
+        else:
+            raise HTTPException(status_code=400, detail=f"Invalid task type: {request.task_type}")
+
+        # Stream response
+        async def event_generator():
+            try:
+                client = OllamaClient(model=model_full_name)
+                start_time = time.time()
+                full_response = ""
+
+                # Send initial metadata
+                yield f"data: {json.dumps({'model': model_full_name, 'task_type': request.task_type})}\n\n"
+
+                # Stream tokens
+                for chunk in client.generate_stream(
+                    prompt=full_prompt,
+                    max_tokens=request.max_tokens,
+                    temperature=temperature
+                ):
+                    if "response" in chunk:
+                        token = chunk["response"]
+                        full_response += token
+                        yield f"data: {json.dumps({'token': token, 'done': False})}\n\n"
+
+                    if chunk.get("done", False):
+                        elapsed_time = time.time() - start_time
+                        completion_data = {
+                            "done": True,
+                            "total_time": elapsed_time,
+                            "model": model_full_name,
+                            "task_type": request.task_type,
+                            "response": full_response
+                        }
+                        yield f"data: {json.dumps(completion_data)}\n\n"
+                        return
+
+            except Exception as e:
+                yield f"data: {json.dumps({'error': str(e), 'done': True})}\n\n"
+
+        return StreamingResponse(
+            event_generator(),
+            media_type="text/event-stream",
+            headers={
+                "Cache-Control": "no-cache",
+                "Connection": "keep-alive",
+                "X-Accel-Buffering": "no",
+                "Transfer-Encoding": "chunked"
+            }
+        )
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+# ============================================================================
+# CODE GENERATION ENDPOINTS (OLD - Keep for compatibility)
 # ============================================================================
 
 @app.post(
