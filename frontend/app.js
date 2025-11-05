@@ -7,13 +7,13 @@ const API_BASE_URL = window.location.origin;
 // State Management
 // ============================================================================
 const state = {
-    currentTab: 'generate',
+    currentTab: 'assistant',
     theme: localStorage.getItem('theme') || 'light',
     connected: false,
     ws: null,
-    viewMode: 'markdown', // 'markdown' or 'code'
+    currentTaskType: 'code', // 'code', 'text', or 'ppt'
     currentRawResponse: '',
-    currentCode: ''
+    selectedModel: null
 };
 
 // ============================================================================
@@ -57,6 +57,7 @@ document.addEventListener('DOMContentLoaded', () => {
     initTheme();
     initTabs();
     initEventListeners();
+    initMermaid();
     checkHealth();
     loadStats();
     loadDownloadedModels(); // Load models for dropdown
@@ -75,11 +76,80 @@ function toggleTheme() {
     localStorage.setItem('theme', state.theme);
     document.documentElement.setAttribute('data-theme', state.theme);
     updateThemeIcon();
+    updateMermaidTheme();
 }
 
 function updateThemeIcon() {
     const icon = document.querySelector('.theme-icon');
     icon.textContent = state.theme === 'light' ? '🌙' : '☀️';
+}
+
+// ============================================================================
+// Mermaid Initialization
+// ============================================================================
+function initMermaid() {
+    if (typeof mermaid !== 'undefined') {
+        mermaid.initialize({
+            startOnLoad: false,
+            theme: state.theme === 'dark' ? 'dark' : 'default',
+            securityLevel: 'loose',
+            fontFamily: 'system-ui, -apple-system, sans-serif',
+            flowchart: {
+                useMaxWidth: true,
+                htmlLabels: true,
+                curve: 'basis'
+            }
+        });
+        console.log('Mermaid initialized');
+    }
+}
+
+// Update Mermaid theme when app theme changes
+function updateMermaidTheme() {
+    if (typeof mermaid !== 'undefined') {
+        mermaid.initialize({
+            theme: state.theme === 'dark' ? 'dark' : 'default'
+        });
+        // Re-render any existing diagrams
+        renderMermaidDiagrams();
+    }
+}
+
+// Render all Mermaid diagrams in the document
+async function renderMermaidDiagrams() {
+    if (typeof mermaid === 'undefined') return;
+
+    // Find all code blocks with language 'mermaid'
+    const mermaidBlocks = document.querySelectorAll('pre code.language-mermaid');
+
+    for (let i = 0; i < mermaidBlocks.length; i++) {
+        const block = mermaidBlocks[i];
+        const pre = block.parentElement;
+
+        // Skip if already rendered
+        if (pre.classList.contains('mermaid-rendered')) continue;
+
+        const code = block.textContent;
+
+        try {
+            // Create a div to hold the rendered diagram
+            const div = document.createElement('div');
+            div.className = 'mermaid';
+            div.textContent = code;
+
+            // Replace the pre block with the mermaid div
+            pre.replaceWith(div);
+
+            // Render the diagram
+            await mermaid.run({
+                nodes: [div]
+            });
+
+        } catch (error) {
+            console.error('Mermaid rendering error:', error);
+            // Keep the original code block if rendering fails
+        }
+    }
 }
 
 // ============================================================================
@@ -110,6 +180,11 @@ function switchTab(tabName) {
         loadRepositories();
         loadStats();
     }
+
+    // Load models when switching to models tab
+    if (tabName === 'models') {
+        loadModels();
+    }
 }
 
 // ============================================================================
@@ -119,16 +194,39 @@ function initEventListeners() {
     // Theme toggle
     document.getElementById('themeToggle').addEventListener('click', toggleTheme);
 
-    // Generate code
-    document.getElementById('generateBtn').addEventListener('click', handleGenerate);
-    document.getElementById('generatePrompt').addEventListener('keydown', (e) => {
-        if (e.ctrlKey && e.key === 'Enter') handleGenerate();
+    // Header title - click to go to AI Assistant
+    document.getElementById('headerTitle').addEventListener('click', () => {
+        switchTab('assistant');
+    });
+
+    // Status indicator - click to open models tab
+    document.getElementById('statusIndicator').addEventListener('click', () => {
+        switchTab('models');
+    });
+
+    // Index repository icon - click to open index tab
+    document.getElementById('indexRepoBtn').addEventListener('click', () => {
+        switchTab('index');
+    });
+
+    // Task type selector buttons
+    document.querySelectorAll('.task-type-btn').forEach(btn => {
+        btn.addEventListener('click', () => {
+            const taskType = btn.dataset.task;
+            selectTaskType(taskType);
+        });
+    });
+
+    // Assistant submit button
+    document.getElementById('assistantSubmitBtn').addEventListener('click', handleAssistantSubmit);
+
+    // Prompt keyboard shortcut
+    document.getElementById('assistantPrompt').addEventListener('keydown', (e) => {
+        if (e.ctrlKey && e.key === 'Enter') handleAssistantSubmit();
     });
 
     // Index repository
     document.getElementById('indexBtn').addEventListener('click', handleIndex);
-
-    // Max Tokens and Temperature dropdowns (no event listeners needed - values read directly)
 }
 
 // ============================================================================
@@ -159,15 +257,27 @@ function updateStatus(connected, text) {
     state.connected = connected;
     const indicator = document.getElementById('statusIndicator');
     const statusText = indicator.querySelector('.status-text');
+    const statusIcon = indicator.querySelector('.status-icon');
 
     indicator.className = 'status-indicator';
-    if (connected) {
+
+    // Update icon, class, and tooltip based on status
+    if (text === 'Connecting...') {
+        indicator.classList.add('connecting');
+        statusIcon.textContent = '🔄';  // Spinning arrows for connecting
+        indicator.title = 'Connecting to Ollama... (Click to manage models)';
+    } else if (connected) {
         indicator.classList.add('connected');
+        statusIcon.textContent = '✅';  // Green checkmark for connected
+        indicator.title = 'Connected to Ollama (Click to manage models)';
     } else {
         indicator.classList.add('error');
+        statusIcon.textContent = '❌';  // Red X for disconnected
+        indicator.title = 'Disconnected - Ollama not available (Click to manage models)';
     }
 
-    statusText.textContent = text;
+    // Hide text, show only icon
+    statusText.style.display = 'none';
 
     // Reload models when connection status changes
     if (wasConnected !== connected) {
@@ -176,8 +286,8 @@ function updateStatus(connected, text) {
             // Reconnected - reload models and dropdown
             loadDownloadedModels();
             // Only reload models table if on models tab
-            const modelsTab = document.querySelector('[data-tab="models"]');
-            if (modelsTab && modelsTab.classList.contains('active')) {
+            const modelsContent = document.getElementById('models');
+            if (modelsContent && modelsContent.classList.contains('active')) {
                 loadModels();
             }
         }
@@ -185,211 +295,212 @@ function updateStatus(connected, text) {
 }
 
 // ============================================================================
-// Generate Code
+// Unified AI Assistant
 // ============================================================================
-async function handleGenerate() {
-    const prompt = document.getElementById('generatePrompt').value.trim();
+
+function selectTaskType(taskType) {
+    state.currentTaskType = taskType;
+
+    // Update button states
+    document.querySelectorAll('.task-type-btn').forEach(btn => {
+        btn.classList.toggle('active', btn.dataset.task === taskType);
+    });
+
+    // Update config panel
+    document.querySelectorAll('.task-config').forEach(config => {
+        config.classList.remove('active');
+    });
+    document.getElementById(`${taskType}Config`).classList.add('active');
+}
+
+async function handleAssistantSubmit() {
+    const prompt = document.getElementById('assistantPrompt').value.trim();
+
     if (!prompt) {
         alert('Please enter a prompt');
         return;
     }
 
-    const model = document.getElementById('generateModel').value;
-    const maxTokens = parseInt(document.getElementById('generateMaxTokens').value);
-    const temperature = parseFloat(document.getElementById('generateTemperature').value);
-    const useStreaming = document.getElementById('generateStream').checked;
+    const taskType = state.currentTaskType;
 
-    const btn = document.getElementById('generateBtn');
-    btn.disabled = true;
+    // Get configuration based on task type
+    let config = {};
+    if (taskType === 'code') {
+        config = {
+            max_tokens: parseInt(document.getElementById('codeMaxTokens').value),
+            temperature: parseFloat(document.getElementById('codeTemperature').value),
+            stream: true  // Always stream
+        };
+    } else if (taskType === 'text') {
+        config = {
+            style: document.getElementById('textStyle').value,
+            max_tokens: parseInt(document.getElementById('textMaxTokens').value),
+            stream: true  // Always stream
+        };
+    } else if (taskType === 'ppt') {
+        config = {
+            output_type: document.getElementById('pptOutputType').value,
+            max_tokens: parseInt(document.getElementById('pptMaxTokens').value),
+            stream: true  // Always stream
+        };
+    }
 
-    // Show progress indicator
-    showGenerateProgress(model);
+    // Show progress
+    document.getElementById('assistantProgress').style.display = 'block';
+    document.getElementById('assistantResult').style.display = 'none';
+    document.getElementById('assistantSubmitBtn').disabled = true;
 
-    // Hide previous results
-    document.getElementById('generateResult').style.display = 'none';
+    const startTime = Date.now();
 
     try {
-        // Check if streaming is enabled
-        if (useStreaming) {
-            await generateWithStreaming(prompt, model, maxTokens, temperature);
-        } else {
-            await generateWithHTTP(prompt, model, maxTokens, temperature);
-        }
+        // Always use streaming
+        await handleAssistantStream(prompt, taskType, config, startTime);
     } catch (error) {
         console.error('Generation error:', error);
         alert(`Error: ${error.message}`);
+        document.getElementById('assistantProgress').style.display = 'none';
     } finally {
-        btn.disabled = false;
-        hideGenerateProgress();
+        document.getElementById('assistantSubmitBtn').disabled = false;
     }
 }
 
-function showGenerateProgress(model) {
-    // Find model display name from cache
-    const modelObj = downloadedModelsCache.find(m => m.key === model);
-    const displayName = modelObj ? modelObj.description : model;
-
-    document.getElementById('generateProgressModel').textContent = displayName;
-    document.getElementById('generateProgress').style.display = 'block';
-}
-
-function hideGenerateProgress() {
-    document.getElementById('generateProgress').style.display = 'none';
-}
-
-async function generateWithHTTP(prompt, model, maxTokens, temperature) {
-    const response = await apiPost('/generate', {
+async function handleAssistantNonStream(prompt, taskType, config, startTime) {
+    const response = await apiPost('/assistant/generate', {
         prompt,
-        model,
-        max_tokens: maxTokens,
-        temperature
+        task_type: taskType,
+        ...config
     });
 
     const data = await response.json();
-    displayGenerateResult(data);
+
+    const elapsed = ((Date.now() - startTime) / 1000).toFixed(2);
+
+    // Hide progress, show result
+    document.getElementById('assistantProgress').style.display = 'none';
+    document.getElementById('assistantResult').style.display = 'block';
+
+    // Render result
+    const markdown = document.getElementById('assistantMarkdown');
+    markdown.innerHTML = marked.parse(data.response || data.result || '');
+
+    // Highlight code blocks
+    markdown.querySelectorAll('pre code').forEach(block => {
+        hljs.highlightElement(block);
+    });
+
+    // Render Mermaid diagrams
+    renderMermaidDiagrams();
+
+    // Update metadata
+    document.getElementById('assistantModel').textContent = data.model || 'Unknown';
+    document.getElementById('assistantTime').textContent = elapsed;
+    document.getElementById('assistantLength').textContent = (data.response || data.result || '').length;
+
+    state.currentRawResponse = data.response || data.result || '';
 }
 
-async function generateWithStreaming(prompt, model, maxTokens, temperature) {
-    // Prepare the result display for streaming
-    const resultDiv = document.getElementById('generateResult');
-    const codeElement = document.getElementById('generateCode');
-    const markdownDiv = document.getElementById('generateMarkdown');
-    const codePre = document.getElementById('generateCodePre');
-    const warningsDiv = document.getElementById('generateWarnings');
+async function handleAssistantStream(prompt, taskType, config, startTime) {
+    // Use fetch directly for streaming to avoid JSON parsing issues
+    const response = await fetch(`${API_BASE_URL}/assistant/generate/stream`, {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+            prompt,
+            task_type: taskType,
+            ...config
+        })
+    });
 
-    // Show result div immediately with markdown view
-    resultDiv.style.display = 'block';
-    markdownDiv.style.display = 'block';
-    codePre.style.display = 'none';
-    markdownDiv.innerHTML = '<p><em>Streaming...</em></p>';
-    warningsDiv.style.display = 'none';
-    state.viewMode = 'markdown';
+    if (!response.ok) {
+        const error = await response.json().catch(() => ({ detail: 'Request failed' }));
+        throw new Error(error.detail || `Request failed: ${response.status}`);
+    }
 
-    // Update progress to show streaming
-    document.getElementById('generateProgressModel').textContent += ' (Streaming...)';
-
+    const reader = response.body.getReader();
+    const decoder = new TextDecoder();
+    let buffer = '';
     let fullResponse = '';
-    let startTime = Date.now();
-    let lastUpdateTime = Date.now();
-    const UPDATE_INTERVAL_MS = 100; // Update UI every 100ms
+    let modelName = '';
 
-    try {
-        // Create EventSource for SSE
-        const url = new URL(`${API_BASE_URL}/generate/stream`);
+    // Show result container immediately for streaming
+    document.getElementById('assistantProgress').style.display = 'none';
+    document.getElementById('assistantResult').style.display = 'block';
 
-        const response = await fetch(url, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-                prompt,
-                model,
-                max_tokens: maxTokens,
-                temperature
-            })
-        });
+    const markdown = document.getElementById('assistantMarkdown');
+    markdown.innerHTML = '';
 
-        if (!response.ok) {
-            const error = await response.json();
-            throw new Error(error.detail || 'Streaming failed');
-        }
+    while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
 
-        // Read the stream
-        const reader = response.body.getReader();
-        const decoder = new TextDecoder();
+        buffer += decoder.decode(value, { stream: true });
+        const lines = buffer.split('\n');
+        buffer = lines.pop() || '';
 
-        while (true) {
-            const { done, value } = await reader.read();
+        for (const line of lines) {
+            if (!line.trim() || !line.startsWith('data: ')) continue;
 
-            if (done) break;
+            const data = line.slice(6);
+            if (data === '[DONE]') continue;
 
-            // Decode the chunk
-            const chunk = decoder.decode(value, { stream: true });
-
-            // Split by newlines to handle multiple SSE messages
-            const lines = chunk.split('\n');
-
-            for (const line of lines) {
-                if (line.startsWith('data: ')) {
-                    const jsonStr = line.substring(6); // Remove 'data: ' prefix
-
-                    try {
-                        const data = JSON.parse(jsonStr);
-
-                        // Handle different event types
-                        if (data.error) {
-                            throw new Error(data.error);
-                        }
-
-                        if (data.status === 'started') {
-                            console.log('Streaming started for model:', data.model);
-                        }
-
-                        if (data.token) {
-                            // Append token to buffer
-                            fullResponse += data.token;
-
-                            // Throttle UI updates to every 100ms for better performance
-                            const now = Date.now();
-                            if (now - lastUpdateTime >= UPDATE_INTERVAL_MS) {
-                                // Render markdown in real-time
-                                renderMarkdown(fullResponse);
-                                lastUpdateTime = now;
-
-                                // Auto-scroll to bottom
-                                resultDiv.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
-                            }
-                        }
-
-                        if (data.done) {
-                            // Streaming complete
-                            const elapsed = (Date.now() - startTime) / 1000;
-
-                            // Store response in state
-                            state.currentRawResponse = data.response || fullResponse;
-
-                            // Final markdown render (this also extracts code)
-                            renderMarkdown(state.currentRawResponse);
-
-                            // Update metadata
-                            document.getElementById('generateTime').textContent =
-                                data.total_time ? data.total_time.toFixed(2) : elapsed.toFixed(2);
-                            document.getElementById('generateLength').textContent =
-                                state.currentRawResponse.length;
-
-                            console.log('Streaming complete in', elapsed, 'seconds');
-                        }
-                    } catch (e) {
-                        console.error('Error parsing SSE data:', e, jsonStr);
-                    }
+            try {
+                const parsed = JSON.parse(data);
+                if (parsed.token) {
+                    fullResponse += parsed.token;
+                    markdown.innerHTML = marked.parse(fullResponse);
+                    markdown.querySelectorAll('pre code').forEach(block => {
+                        hljs.highlightElement(block);
+                    });
+                    // Render Mermaid diagrams
+                    renderMermaidDiagrams();
                 }
+                if (parsed.model) {
+                    modelName = parsed.model;
+                }
+            } catch (e) {
+                console.error('Parse error:', e);
             }
         }
-
-    } catch (error) {
-        console.error('Streaming error:', error);
-        codeElement.textContent = `// Error: ${error.message}`;
-        throw error;
     }
+
+    const elapsed = ((Date.now() - startTime) / 1000).toFixed(2);
+
+    // Update metadata
+    document.getElementById('assistantModel').textContent = modelName || 'Unknown';
+    document.getElementById('assistantTime').textContent = elapsed;
+    document.getElementById('assistantLength').textContent = fullResponse.length;
+
+    state.currentRawResponse = fullResponse;
 }
 
-
-function displayGenerateResult(data) {
-    const resultDiv = document.getElementById('generateResult');
-
-    // Store response in state
-    state.currentRawResponse = data.response || '';
-
-    // Render markdown (this also extracts code for code-only view)
-    renderMarkdown(state.currentRawResponse);
-
-    // Display metadata
-    document.getElementById('generateTime').textContent =
-        data.generation_time ? data.generation_time.toFixed(2) : '-';
-    document.getElementById('generateLength').textContent = state.currentRawResponse.length;
-
-    resultDiv.style.display = 'block';
-    resultDiv.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+function copyAssistantResult() {
+    navigator.clipboard.writeText(state.currentRawResponse);
+    alert('Copied to clipboard!');
 }
+
+function downloadAssistantResult() {
+    const taskType = state.currentTaskType;
+    const extension = taskType === 'code' ? 'txt' : 'md';
+    const blob = new Blob([state.currentRawResponse], { type: 'text/plain' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `assistant_result.${extension}`;
+    a.click();
+    URL.revokeObjectURL(url);
+}
+
+// ============================================================================
+// Old Generate Code functions removed - using unified AI Assistant interface
+// ============================================================================
+
+
+
+// ============================================================================
+// Old Text Enhancement functions removed - using unified AI Assistant interface
+// ============================================================================
 
 // ============================================================================
 // Index Repository
@@ -747,28 +858,51 @@ async function loadDownloadedModels(noCache = false) {
 }
 
 function updateModelDropdown() {
-    const select = document.getElementById('generateModel');
-    select.innerHTML = '';
+    const generateSelect = document.getElementById('generateModel');
+    const enhanceSelect = document.getElementById('enhanceModel');
+
+    // Check if elements exist (they don't in the new unified interface)
+    if (!generateSelect || !enhanceSelect) {
+        return;
+    }
+
+    generateSelect.innerHTML = '';
+    enhanceSelect.innerHTML = '';
 
     if (downloadedModelsCache.length === 0) {
-        const option = document.createElement('option');
-        option.value = '';
-        option.textContent = 'No models downloaded - Go to Manage Models tab';
-        option.disabled = true;
-        select.appendChild(option);
+        const option1 = document.createElement('option');
+        option1.value = '';
+        option1.textContent = 'No models downloaded - Go to Manage Models tab';
+        option1.disabled = true;
+        generateSelect.appendChild(option1);
+
+        const option2 = document.createElement('option');
+        option2.value = '';
+        option2.textContent = 'No models downloaded - Go to Manage Models tab';
+        option2.disabled = true;
+        enhanceSelect.appendChild(option2);
         return;
     }
 
     // Use metadata from backend (no hardcoded names!)
     downloadedModelsCache.forEach((model, index) => {
-        const option = document.createElement('option');
-        // model is now an object with {key, name, description}
-        option.value = model.key;
-        option.textContent = model.description; // Use description from backend
+        // Add to generate model dropdown
+        const option1 = document.createElement('option');
+        option1.value = model.key;
+        option1.textContent = model.description; // Use description from backend
         if (index === 0) {
-            option.selected = true;  // Make first model default
+            option1.selected = true;  // Make first model default
         }
-        select.appendChild(option);
+        generateSelect.appendChild(option1);
+
+        // Add to enhance model dropdown
+        const option2 = document.createElement('option');
+        option2.value = model.key;
+        option2.textContent = model.description;
+        if (index === 0) {
+            option2.selected = true;
+        }
+        enhanceSelect.appendChild(option2);
     });
 }
 
@@ -796,16 +930,51 @@ function renderModelsTable(models) {
     const tableBody = document.getElementById('modelsTableBody');
     tableBody.innerHTML = '';
 
-    models.forEach(model => {
+    // Sort models: recommended first, then by priority
+    const sortedModels = [...models].sort((a, b) => {
+        if (a.recommended && !b.recommended) return -1;
+        if (!a.recommended && b.recommended) return 1;
+        return (a.priority || 999) - (b.priority || 999);
+    });
+
+    sortedModels.forEach(model => {
         const row = document.createElement('tr');
+
+        // Highlight recommended models
+        if (model.recommended) {
+            row.style.background = 'linear-gradient(90deg, rgba(102, 126, 234, 0.05) 0%, rgba(118, 75, 162, 0.05) 100%)';
+            row.style.borderLeft = '3px solid #667eea';
+        }
+
+        // Get best-for badge
+        const bestForBadges = {
+            'code': '💻 Code',
+            'workflow': '🎨 Workflow',
+            'ppt': '📊 PPT'
+        };
+        const bestForBadge = bestForBadges[model.best_for] || '🔧 General';
+
+        // Get performance summary
+        const perfSummary = model.performance
+            ? `Code: ${model.performance.code}<br>Workflow: ${model.performance.workflow}<br>PPT: ${model.performance.ppt}<br>Speed: ${model.performance.speed}`
+            : 'N/A';
+
         row.innerHTML = `
             <td>
                 <input type="checkbox" class="model-checkbox" data-model="${model.key}" ${model.downloaded ? '' : ''}>
             </td>
-            <td class="model-name">${model.name}</td>
+            <td class="model-name">
+                ${model.name}
+                ${model.recommended ? '<span style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; padding: 2px 8px; border-radius: 12px; font-size: 0.75rem; margin-left: 8px;">⭐ Recommended</span>' : ''}
+            </td>
             <td>${model.description}</td>
+            <td>
+                <span style="background: #667eea; color: white; padding: 4px 10px; border-radius: 6px; font-size: 0.85rem; font-weight: 600;">
+                    ${bestForBadge}
+                </span>
+            </td>
             <td>${model.size}</td>
-            <td>${model.license}</td>
+            <td style="font-size: 0.85rem; line-height: 1.6;">${perfSummary}</td>
             <td>
                 <span class="model-status ${model.downloaded ? 'downloaded' : 'not-downloaded'}">
                     <span class="model-status-dot"></span>
@@ -834,6 +1003,72 @@ document.getElementById('selectAll').addEventListener('change', (e) => {
 
 // Refresh models
 document.getElementById('refreshModels').addEventListener('click', loadModels);
+
+// Download recommended models
+document.getElementById('downloadRecommended').addEventListener('click', async () => {
+    // Get recommended models that are not downloaded
+    const recommendedModels = modelsData
+        .filter(m => m.recommended && !m.downloaded)
+        .map(m => m.key);
+
+    if (recommendedModels.length === 0) {
+        showModelsMessage('All recommended models are already downloaded!', 'success');
+        return;
+    }
+
+    const recommendedInfo = modelsData
+        .filter(m => m.recommended && !m.downloaded)
+        .map(m => `• ${m.name} (${m.size}) - Best for ${m.best_for}`)
+        .join('\n');
+
+    const confirmMsg = `This will download ${recommendedModels.length} recommended model(s):\n\n${recommendedInfo}\n\nTotal size: ~10.5 GB\nContinue?`;
+
+    if (!confirm(confirmMsg)) {
+        return;
+    }
+
+    hideElements('modelsSuccess', 'modelsError');
+
+    let successCount = 0;
+    let errorCount = 0;
+
+    for (const modelKey of recommendedModels) {
+        try {
+            const response = await fetch(`/models/${modelKey}/download`, {
+                method: 'POST'
+            });
+
+            const data = await response.json();
+
+            if (response.ok) {
+                if (data.status === 'downloading' || data.status === 'already_downloaded') {
+                    successCount++;
+                }
+            } else {
+                errorCount++;
+            }
+        } catch (error) {
+            console.error(`Error downloading ${modelKey}:`, error);
+            errorCount++;
+        }
+    }
+
+    if (successCount > 0) {
+        showModelsMessage(
+            `Started downloading ${successCount} recommended model(s). Check logs for progress. This may take 10-20 minutes.`,
+            'success'
+        );
+    }
+
+    if (errorCount > 0) {
+        showModelsMessage(`Failed to download ${errorCount} model(s)`, 'error');
+    }
+
+    // Reload models after a delay
+    setTimeout(() => {
+        loadModels();
+    }, 2000);
+});
 
 // Download selected models
 document.getElementById('downloadSelected').addEventListener('click', async () => {
@@ -926,10 +1161,8 @@ function showModelsMessage(message, type) {
     }
 }
 
-// Load models when the models tab is opened
-document.querySelector('[data-tab="models"]').addEventListener('click', () => {
-    loadModels();
-});
+// Load models when the models tab is opened (via status icon click)
+// Note: Models are loaded when switching to the models tab via switchTab() function
 
 // ============================================================================
 // Auto-refresh health check
@@ -984,74 +1217,4 @@ function downloadCode(elementId, filename) {
     URL.revokeObjectURL(url);
 }
 
-function toggleResponseView() {
-    const markdownDiv = document.getElementById('generateMarkdown');
-    const codePre = document.getElementById('generateCodePre');
-    const toggleBtn = document.getElementById('toggleViewBtn');
-
-    if (state.viewMode === 'markdown') {
-        // Switch to code-only view
-        state.viewMode = 'code';
-        markdownDiv.style.display = 'none';
-        codePre.style.display = 'block';
-        toggleBtn.textContent = '📝 Show Full Response';
-    } else {
-        // Switch to markdown view
-        state.viewMode = 'markdown';
-        markdownDiv.style.display = 'block';
-        codePre.style.display = 'none';
-        toggleBtn.textContent = '💻 Show Code Only';
-    }
-}
-
-function extractCodeFromMarkdown(markdown) {
-    // Extract code blocks from markdown
-    const codeBlockRegex = /```[\w]*\n([\s\S]*?)```/g;
-    const matches = [];
-    let match;
-
-    while ((match = codeBlockRegex.exec(markdown)) !== null) {
-        matches.push(match[1].trim());
-    }
-
-    // If we found code blocks, join them
-    if (matches.length > 0) {
-        return matches.join('\n\n');
-    }
-
-    // If no code blocks found, return the whole response
-    return markdown;
-}
-
-function renderMarkdown(rawResponse) {
-    const markdownDiv = document.getElementById('generateMarkdown');
-    const codeElement = document.getElementById('generateCode');
-
-    // Configure marked with better options
-    marked.setOptions({
-        highlight: function(code, lang) {
-            if (lang && hljs.getLanguage(lang)) {
-                try {
-                    return hljs.highlight(code, { language: lang }).value;
-                } catch (err) {
-                    console.error('Highlight error:', err);
-                }
-            }
-            return hljs.highlightAuto(code).value;
-        },
-        breaks: true,
-        gfm: true,
-        headerIds: true,
-        mangle: false
-    });
-
-    // Render markdown to HTML
-    const html = marked.parse(rawResponse);
-    markdownDiv.innerHTML = html;
-
-    // Extract code for code-only view
-    const extractedCode = extractCodeFromMarkdown(rawResponse);
-    state.currentCode = extractedCode;
-    codeElement.textContent = extractedCode;
-    hljs.highlightElement(codeElement);
-}
+// Old view toggle and markdown rendering functions removed - no longer needed
