@@ -3,7 +3,9 @@ requests  # For Ollama API calls
 libclang  # C++ parsing and symbol extraction
 
 # Vector search and embeddings
-torch>=2.0.0  # PyTorch for deep learning
+# Use CPU-only PyTorch to reduce image size (~1GB smaller)
+--extra-index-url https://download.pytorch.org/whl/cpu
+torch>=2.0.0  # PyTorch for deep learning (CPU-only)
 sentence-transformers  # Semantic code search
 faiss-cpu  # Vector similarity search
 

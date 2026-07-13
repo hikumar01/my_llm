@@ -30,9 +30,11 @@ ENV/
 # Documentation (not needed in container)
 *.md
 !README.md
+docs/
 
 # Setup scripts (run on host, not in container)
 setup_models.sh
+run.sh
 
 # Test files
 test_*.sh

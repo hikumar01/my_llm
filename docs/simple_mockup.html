@@ -1,0 +1,508 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Unified Smart Interface - Mockup</title>
+    <script src="https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.min.js"></script>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            padding: 20px;
+            min-height: 100vh;
+        }
+        
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            background: white;
+            border-radius: 20px;
+            box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+            overflow: hidden;
+        }
+        
+        .header {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 30px;
+            text-align: center;
+        }
+        
+        .header h1 { font-size: 2rem; margin-bottom: 10px; }
+        .header p { opacity: 0.9; }
+        
+        .content { padding: 30px; }
+        
+        .form-group {
+            margin-bottom: 20px;
+        }
+        
+        label {
+            display: block;
+            font-weight: 600;
+            margin-bottom: 8px;
+            color: #333;
+        }
+        
+        textarea, select, input[type="file"] {
+            width: 100%;
+            padding: 12px;
+            border: 2px solid #dee2e6;
+            border-radius: 8px;
+            font-family: inherit;
+            font-size: 1rem;
+            transition: border-color 0.3s;
+        }
+        
+        textarea {
+            resize: vertical;
+            min-height: 120px;
+        }
+        
+        textarea:focus, select:focus {
+            outline: none;
+            border-color: #667eea;
+        }
+        
+        .form-row {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 15px;
+            margin-bottom: 20px;
+        }
+        
+        .btn {
+            width: 100%;
+            padding: 15px;
+            border: none;
+            border-radius: 8px;
+            font-size: 1.1rem;
+            font-weight: bold;
+            cursor: pointer;
+            transition: all 0.3s;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+        }
+        
+        .btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 8px 20px rgba(102, 126, 234, 0.4);
+        }
+        
+        .examples {
+            background: #f8f9fa;
+            padding: 15px;
+            border-radius: 8px;
+            margin-bottom: 20px;
+            font-size: 0.9rem;
+        }
+        
+        .examples strong { color: #667eea; }
+        .examples ul { margin-left: 20px; margin-top: 8px; }
+        .examples li { margin: 5px 0; color: #6c757d; }
+        
+        .result {
+            margin-top: 30px;
+            padding: 20px;
+            background: #f8f9fa;
+            border-radius: 12px;
+            display: none;
+        }
+        
+        .mode-indicator {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 12px 20px;
+            border-radius: 8px;
+            margin-bottom: 20px;
+            font-weight: 600;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+        
+        .code-output {
+            background: #1e1e1e;
+            color: #d4d4d4;
+            padding: 20px;
+            border-radius: 8px;
+            font-family: 'Courier New', monospace;
+            overflow-x: auto;
+            white-space: pre-wrap;
+        }
+        
+        .workflow-container {
+            background: white;
+            padding: 20px;
+            border-radius: 8px;
+            margin-bottom: 20px;
+        }
+        
+        .export-options {
+            display: flex;
+            gap: 10px;
+            flex-wrap: wrap;
+        }
+        
+        .export-options button {
+            padding: 10px 20px;
+            border: none;
+            border-radius: 6px;
+            background: #667eea;
+            color: white;
+            cursor: pointer;
+            font-weight: 600;
+            transition: all 0.3s;
+        }
+        
+        .export-options button:hover {
+            background: #764ba2;
+            transform: translateY(-2px);
+        }
+        
+        .ppt-options {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 20px;
+            margin-bottom: 20px;
+        }
+        
+        .ppt-option {
+            background: white;
+            border: 3px solid #dee2e6;
+            border-radius: 12px;
+            padding: 20px;
+            cursor: pointer;
+            transition: all 0.3s;
+        }
+        
+        .ppt-option:hover {
+            border-color: #667eea;
+            transform: translateY(-2px);
+            box-shadow: 0 8px 20px rgba(102, 126, 234, 0.2);
+        }
+        
+        .ppt-option.selected {
+            border-color: #43e97b;
+            background: #f0fff4;
+        }
+        
+        .option-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 15px;
+        }
+        
+        .option-header h4 {
+            color: #667eea;
+            font-size: 1.1rem;
+        }
+        
+        .option-preview {
+            background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
+            height: 150px;
+            border-radius: 8px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: white;
+            font-weight: 600;
+            margin-bottom: 15px;
+        }
+        
+        .option-description {
+            color: #6c757d;
+            font-size: 0.95rem;
+            line-height: 1.6;
+        }
+        
+        .ppt-actions {
+            display: flex;
+            gap: 10px;
+        }
+        
+        .ppt-actions button {
+            flex: 1;
+            padding: 12px;
+            border: none;
+            border-radius: 8px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s;
+        }
+        
+        .btn-primary {
+            background: #43e97b;
+            color: white;
+        }
+        
+        .btn-secondary {
+            background: #6c757d;
+            color: white;
+        }
+        
+        .ppt-actions button:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(0,0,0,0.2);
+        }
+        
+        .badge {
+            display: inline-block;
+            padding: 4px 12px;
+            background: #667eea;
+            color: white;
+            border-radius: 20px;
+            font-size: 0.85rem;
+            margin-left: 10px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>🤖 Unified Smart Interface</h1>
+            <p>One interface for Code, Workflows, and Presentations - Auto-detects your intent!</p>
+        </div>
+        
+        <div class="content">
+            <div class="examples">
+                <strong>💡 Try these examples:</strong>
+                <ul>
+                    <li><em>"Write a Python function to reverse a string"</em> → Code Generation</li>
+                    <li><em>"Create a CI/CD pipeline diagram"</em> → Workflow Diagram</li>
+                    <li><em>"Generate a flowchart for user authentication"</em> → Workflow Diagram</li>
+                    <li><em>"Enhance my presentation slide about AI"</em> → PPT Enhancement</li>
+                </ul>
+            </div>
+            
+            <div class="form-group">
+                <label for="prompt">What do you want to create?</label>
+                <textarea id="prompt" placeholder="Describe what you want to create... The system will automatically detect if you want code, a workflow diagram, or presentation enhancement."></textarea>
+            </div>
+            
+            <div class="form-group">
+                <label for="mode">Mode (Optional - Auto-detects if not selected) <span class="badge">Smart</span></label>
+                <select id="mode" onchange="updatePlaceholder()">
+                    <option value="auto">🤖 Auto-detect (Recommended)</option>
+                    <option value="code">💻 Code Generation</option>
+                    <option value="workflow">🎨 Workflow Diagram</option>
+                    <option value="ppt">📊 PPT Enhancement</option>
+                </select>
+            </div>
+            
+            <div class="form-row">
+                <div class="form-group">
+                    <label for="model">Model</label>
+                    <select id="model">
+                        <option>DeepSeek Coder (Best for code)</option>
+                        <option>Llama 3.2 (Best for workflows)</option>
+                        <option>Qwen 2.5 Coder</option>
+                    </select>
+                </div>
+                
+                <div class="form-group">
+                    <label for="temperature">Temperature</label>
+                    <select id="temperature">
+                        <option>0.2 - Focused (Recommended)</option>
+                        <option>0.5 - Balanced</option>
+                        <option>0.7 - Creative</option>
+                    </select>
+                </div>
+            </div>
+            
+            <button class="btn" onclick="generate()">✨ Generate</button>
+            
+            <div id="result" class="result"></div>
+        </div>
+    </div>
+    
+    <script>
+        mermaid.initialize({ startOnLoad: false, theme: 'default' });
+        
+        const examples = {
+            code: "Write a Python function to reverse a string",
+            workflow: "Create a CI/CD pipeline with build, test, and deploy stages",
+            ppt: "Enhance my presentation slide about AI with modern design and infographics"
+        };
+        
+        function updatePlaceholder() {
+            const mode = document.getElementById('mode').value;
+            const textarea = document.getElementById('prompt');
+            
+            if (mode === 'auto') {
+                textarea.placeholder = "Describe what you want to create... The system will automatically detect if you want code, a workflow diagram, or presentation enhancement.";
+            } else {
+                textarea.value = examples[mode] || '';
+            }
+        }
+        
+        function generate() {
+            const prompt = document.getElementById('prompt').value.trim();
+            const mode = document.getElementById('mode').value;
+            
+            if (!prompt) {
+                alert('Please enter a prompt');
+                return;
+            }
+            
+            // Simulate detection
+            const detected = detectIntent(prompt, mode);
+            
+            // Show result based on detection
+            if (detected === 'workflow') {
+                showWorkflowResult(prompt);
+            } else if (detected === 'ppt') {
+                showPPTResult(prompt);
+            } else {
+                showCodeResult(prompt);
+            }
+        }
+        
+        function detectIntent(prompt, mode) {
+            if (mode !== 'auto') return mode;
+            
+            const lower = prompt.toLowerCase();
+            
+            // Workflow keywords
+            if (lower.includes('workflow') || lower.includes('diagram') || 
+                lower.includes('flowchart') || lower.includes('pipeline') ||
+                lower.includes('process flow') || lower.includes('architecture')) {
+                return 'workflow';
+            }
+            
+            // PPT keywords
+            if (lower.includes('presentation') || lower.includes('slide') || 
+                lower.includes('ppt') || lower.includes('enhance')) {
+                return 'ppt';
+            }
+            
+            // Default to code
+            return 'code';
+        }
+        
+        function showCodeResult(prompt) {
+            const result = document.getElementById('result');
+            result.innerHTML = `
+                <div class="mode-indicator">
+                    💻 Code Generation <span style="opacity: 0.8">(95% confidence)</span>
+                </div>
+                <div class="code-output">def reverse_string(s: str) -> str:
+    """
+    Reverse a string using Python slicing.
+    
+    Args:
+        s: Input string to reverse
+        
+    Returns:
+        Reversed string
+    """
+    return s[::-1]
+
+
+# Example usage
+if __name__ == "__main__":
+    text = "Hello, World!"
+    reversed_text = reverse_string(text)
+    print(f"Original: {text}")
+    print(f"Reversed: {reversed_text}")</div>
+            `;
+            result.style.display = 'block';
+        }
+        
+        function showWorkflowResult(prompt) {
+            const result = document.getElementById('result');
+            const diagramCode = `graph LR
+    A[Code Commit] --> B[Build]
+    B --> C[Unit Tests]
+    C --> D{Tests Pass?}
+    D -->|Yes| E[Deploy to Staging]
+    D -->|No| F[Notify Developer]
+    E --> G[Integration Tests]
+    G --> H{Tests Pass?}
+    H -->|Yes| I[Deploy to Production]
+    H -->|No| F
+    I --> J[Monitor]`;
+            
+            result.innerHTML = `
+                <div class="mode-indicator">
+                    🎨 Workflow Diagram <span style="opacity: 0.8">(92% confidence)</span>
+                </div>
+                <div class="workflow-container">
+                    <div class="mermaid">${diagramCode}</div>
+                </div>
+                <div class="export-options">
+                    <button onclick="alert('Export as SVG')">📄 Export SVG</button>
+                    <button onclick="alert('Export as PNG')">🖼️ Export PNG</button>
+                    <button onclick="alert('Export as PDF')">📑 Export PDF</button>
+                    <button onclick="alert('Copy embed code')">📋 Copy Embed Code</button>
+                </div>
+            `;
+            result.style.display = 'block';
+            
+            // Render mermaid
+            setTimeout(() => {
+                mermaid.init(undefined, document.querySelectorAll('.mermaid'));
+            }, 100);
+        }
+        
+        function showPPTResult(prompt) {
+            const result = document.getElementById('result');
+            result.innerHTML = `
+                <div class="mode-indicator">
+                    📊 PPT Enhancement Options <span style="opacity: 0.8">(88% confidence)</span>
+                </div>
+                <div class="ppt-options">
+                    <div class="ppt-option" onclick="toggleOption(this)">
+                        <div class="option-header">
+                            <h4>Option 1: Modern Design</h4>
+                            <input type="checkbox">
+                        </div>
+                        <div class="option-preview">Modern Layout Preview</div>
+                        <div class="option-description">
+                            Clean, modern design with bold typography, gradient backgrounds, and minimalist icons. Perfect for tech presentations.
+                        </div>
+                    </div>
+                    
+                    <div class="ppt-option" onclick="toggleOption(this)">
+                        <div class="option-header">
+                            <h4>Option 2: Infographic Style</h4>
+                            <input type="checkbox">
+                        </div>
+                        <div class="option-preview">Infographic Preview</div>
+                        <div class="option-description">
+                            Visual-heavy design with charts, diagrams, and data visualization. Great for presenting complex information clearly.
+                        </div>
+                    </div>
+                    
+                    <div class="ppt-option" onclick="toggleOption(this)">
+                        <div class="option-header">
+                            <h4>Option 3: Professional</h4>
+                            <input type="checkbox">
+                        </div>
+                        <div class="option-preview">Professional Preview</div>
+                        <div class="option-description">
+                            Corporate-friendly design with structured layout, professional color scheme, and clear hierarchy. Ideal for business presentations.
+                        </div>
+                    </div>
+                </div>
+                <div class="ppt-actions">
+                    <button class="btn-primary" onclick="alert('Applying selected options...')">✅ Apply Selected</button>
+                    <button class="btn-secondary" onclick="generate()">🔄 Regenerate Options</button>
+                </div>
+            `;
+            result.style.display = 'block';
+        }
+        
+        function toggleOption(element) {
+            element.classList.toggle('selected');
+            const checkbox = element.querySelector('input[type="checkbox"]');
+            checkbox.checked = !checkbox.checked;
+        }
+    </script>
+</body>
+</html>
+
