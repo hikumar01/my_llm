@@ -1,0 +1,551 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>PPT Enhancer - UI Mockup</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            padding: 20px;
+            min-height: 100vh;
+        }
+        
+        .container {
+            max-width: 1600px;
+            margin: 0 auto;
+            background: white;
+            border-radius: 20px;
+            box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+            overflow: hidden;
+        }
+        
+        .header {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 30px;
+            text-align: center;
+        }
+        
+        .header h1 { font-size: 2.5rem; margin-bottom: 10px; }
+        .header p { opacity: 0.9; font-size: 1.1rem; }
+        
+        .tabs {
+            display: flex;
+            background: #f8f9fa;
+            border-bottom: 2px solid #dee2e6;
+        }
+        
+        .tab {
+            flex: 1;
+            padding: 15px;
+            text-align: center;
+            cursor: pointer;
+            border: none;
+            background: transparent;
+            font-size: 1rem;
+            transition: all 0.3s;
+        }
+        
+        .tab:hover { background: #e9ecef; }
+        .tab.active { background: white; border-bottom: 3px solid #667eea; font-weight: bold; }
+        
+        .content {
+            display: grid;
+            grid-template-columns: 35% 65%;
+            gap: 20px;
+            padding: 30px;
+            min-height: 800px;
+        }
+        
+        .panel {
+            background: #f8f9fa;
+            padding: 25px;
+            border-radius: 12px;
+        }
+        
+        .panel h2 {
+            margin-bottom: 20px;
+            color: #667eea;
+            font-size: 1.5rem;
+        }
+        
+        .upload-area {
+            border: 3px dashed #667eea;
+            border-radius: 12px;
+            padding: 40px;
+            text-align: center;
+            background: white;
+            cursor: pointer;
+            transition: all 0.3s;
+            margin-bottom: 20px;
+        }
+        
+        .upload-area:hover {
+            background: #f0f4ff;
+            border-color: #764ba2;
+        }
+        
+        .upload-area .icon { font-size: 3rem; margin-bottom: 10px; }
+        
+        .slide-grid {
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            gap: 10px;
+            margin: 20px 0;
+        }
+        
+        .slide-thumb {
+            aspect-ratio: 16/9;
+            background: white;
+            border: 2px solid #dee2e6;
+            border-radius: 8px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            transition: all 0.3s;
+            position: relative;
+        }
+        
+        .slide-thumb:hover {
+            border-color: #667eea;
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(102, 126, 234, 0.3);
+        }
+        
+        .slide-thumb.selected {
+            border-color: #667eea;
+            border-width: 3px;
+            background: #f0f4ff;
+        }
+        
+        .slide-thumb .number {
+            font-size: 1.5rem;
+            color: #6c757d;
+        }
+        
+        .slide-thumb.selected::after {
+            content: '✓';
+            position: absolute;
+            top: 5px;
+            right: 5px;
+            background: #667eea;
+            color: white;
+            width: 24px;
+            height: 24px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 0.9rem;
+        }
+        
+        textarea {
+            width: 100%;
+            padding: 15px;
+            border: 2px solid #dee2e6;
+            border-radius: 8px;
+            font-family: inherit;
+            font-size: 1rem;
+            resize: vertical;
+            margin: 10px 0;
+        }
+        
+        textarea:focus {
+            outline: none;
+            border-color: #667eea;
+        }
+        
+        .btn {
+            width: 100%;
+            padding: 15px;
+            border: none;
+            border-radius: 8px;
+            font-size: 1.1rem;
+            font-weight: bold;
+            cursor: pointer;
+            transition: all 0.3s;
+            margin: 10px 0;
+        }
+        
+        .btn-primary {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+        }
+        
+        .btn-primary:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 8px 20px rgba(102, 126, 234, 0.4);
+        }
+        
+        .options-grid {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 20px;
+            margin: 20px 0;
+        }
+        
+        .option-card {
+            background: white;
+            border: 3px solid #dee2e6;
+            border-radius: 12px;
+            padding: 15px;
+            cursor: pointer;
+            transition: all 0.3s;
+        }
+        
+        .option-card:hover {
+            border-color: #667eea;
+            transform: translateY(-2px);
+            box-shadow: 0 8px 20px rgba(102, 126, 234, 0.2);
+        }
+        
+        .option-card.selected {
+            border-color: #43e97b;
+            border-width: 4px;
+            background: #f0fff4;
+        }
+        
+        .option-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 10px;
+        }
+        
+        .option-title {
+            font-weight: bold;
+            font-size: 1.1rem;
+            color: #667eea;
+        }
+        
+        .option-checkbox {
+            width: 24px;
+            height: 24px;
+            cursor: pointer;
+        }
+        
+        .option-preview {
+            aspect-ratio: 16/9;
+            background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
+            border-radius: 8px;
+            margin: 10px 0;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: white;
+            font-size: 0.9rem;
+        }
+        
+        .option-changes {
+            font-size: 0.9rem;
+            color: #6c757d;
+            line-height: 1.6;
+        }
+        
+        .option-changes li {
+            margin-left: 20px;
+        }
+        
+        .rating {
+            color: #ffc107;
+            font-size: 1.2rem;
+        }
+        
+        .comparison-view {
+            background: white;
+            border-radius: 12px;
+            padding: 20px;
+            margin: 20px 0;
+        }
+        
+        .comparison-grid {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 15px;
+        }
+        
+        .comparison-item {
+            text-align: center;
+        }
+        
+        .comparison-item h4 {
+            margin-bottom: 10px;
+            color: #667eea;
+        }
+        
+        .comparison-preview {
+            aspect-ratio: 16/9;
+            background: linear-gradient(135deg, #a8edea 0%, #fed6e3 100%);
+            border-radius: 8px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: #333;
+        }
+        
+        .action-buttons {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 10px;
+            margin-top: 20px;
+        }
+        
+        .btn-secondary {
+            background: #6c757d;
+            color: white;
+        }
+        
+        .btn-success {
+            background: #43e97b;
+            color: white;
+        }
+        
+        .btn-warning {
+            background: #ffc107;
+            color: #333;
+        }
+        
+        .badge {
+            display: inline-block;
+            padding: 5px 10px;
+            background: #667eea;
+            color: white;
+            border-radius: 20px;
+            font-size: 0.85rem;
+            margin: 5px 0;
+        }
+        
+        .original-preview {
+            background: white;
+            border-radius: 12px;
+            padding: 20px;
+            margin-bottom: 20px;
+        }
+        
+        .original-preview h3 {
+            color: #667eea;
+            margin-bottom: 15px;
+        }
+        
+        .slide-preview-large {
+            aspect-ratio: 16/9;
+            background: linear-gradient(135deg, #ffeaa7 0%, #fdcb6e 100%);
+            border-radius: 12px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1.2rem;
+            color: #333;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>🎨 PPT Enhancer - Interactive Mockup</h1>
+            <p>Upload presentations and generate multiple enhancement options with side-by-side comparison</p>
+        </div>
+        
+        <div class="tabs">
+            <button class="tab">Generate Code</button>
+            <button class="tab">Index Repository</button>
+            <button class="tab">Manage Models</button>
+            <button class="tab">🎨 Workflows</button>
+            <button class="tab active">📊 PPT Enhancer</button>
+        </div>
+        
+        <div class="content">
+            <!-- Left Panel: Controls -->
+            <div class="panel">
+                <h2>📤 Upload & Configure</h2>
+                
+                <div class="upload-area" onclick="alert('File upload would trigger here')">
+                    <div class="icon">📄</div>
+                    <div><strong>Drop PPT file here</strong></div>
+                    <div style="color: #6c757d; margin-top: 5px;">or click to browse</div>
+                </div>
+                
+                <div style="background: white; padding: 15px; border-radius: 8px; margin-bottom: 20px;">
+                    <strong>📄 presentation.pptx</strong><br>
+                    <span style="color: #6c757d; font-size: 0.9rem;">15 slides | 2.3 MB</span>
+                </div>
+                
+                <h3 style="margin: 20px 0 10px 0;">🖼️ Select Slides</h3>
+                <div class="slide-grid" id="slideGrid">
+                    <!-- Slides will be generated by JS -->
+                </div>
+                
+                <div class="badge">Selected: Slide 2, 5, 7</div>
+                
+                <h3 style="margin: 20px 0 10px 0;">✏️ Enhancement Request</h3>
+                <textarea rows="4" placeholder="Example: Make slide 2 more visual with infographics and modern design...">Make slide 2 more visual with infographics and improve the layout</textarea>
+                
+                <h3 style="margin: 20px 0 10px 0;">⚙️ Options</h3>
+                <div style="background: white; padding: 15px; border-radius: 8px;">
+                    <label><strong>Number of variations:</strong></label><br>
+                    <input type="radio" name="num" checked> 3 &nbsp;
+                    <input type="radio" name="num"> 4 &nbsp;
+                    <input type="radio" name="num"> 5<br><br>
+                    
+                    <label><strong>Style:</strong></label><br>
+                    <select style="width: 100%; padding: 8px; border-radius: 4px;">
+                        <option>Professional</option>
+                        <option>Creative</option>
+                        <option>Minimal</option>
+                    </select>
+                </div>
+                
+                <button class="btn btn-primary" onclick="generateOptions()">🎨 Generate Enhancement Options</button>
+            </div>
+            
+            <!-- Right Panel: Preview & Selection -->
+            <div class="panel">
+                <h2>👁️ Preview & Selection</h2>
+                
+                <div class="original-preview">
+                    <h3>📌 Original - Slide 2</h3>
+                    <div class="slide-preview-large">
+                        Current Slide Content
+                    </div>
+                </div>
+                
+                <h3 style="margin: 20px 0 10px 0;">🎯 Enhancement Options</h3>
+                <div class="options-grid" id="optionsGrid">
+                    <!-- Options will be generated by JS -->
+                </div>
+                
+                <div class="comparison-view" id="comparisonView" style="display: none;">
+                    <h3 style="color: #667eea; margin-bottom: 15px;">🔍 Side-by-Side Comparison</h3>
+                    <div class="comparison-grid">
+                        <div class="comparison-item">
+                            <h4>Original</h4>
+                            <div class="comparison-preview">Original Content</div>
+                        </div>
+                        <div class="comparison-item">
+                            <h4>Option 1</h4>
+                            <div class="comparison-preview">Modern Design</div>
+                        </div>
+                        <div class="comparison-item">
+                            <h4>Option 3</h4>
+                            <div class="comparison-preview">Infographic Style</div>
+                        </div>
+                    </div>
+                </div>
+                
+                <h3 style="margin: 20px 0 10px 0;">💬 Request Modifications</h3>
+                <textarea rows="2" placeholder="Example: Combine Option 1's layout with Option 3's visual icons..."></textarea>
+                
+                <div class="action-buttons">
+                    <button class="btn btn-success" onclick="applyOptions()">✅ Apply Selected (2)</button>
+                    <button class="btn btn-secondary" onclick="generateOptions()">🔄 Regenerate</button>
+                    <button class="btn btn-warning" onclick="alert('Modify with feedback')">✏️ Modify</button>
+                    <button class="btn btn-primary" onclick="alert('Download enhanced PPT')">💾 Download PPT</button>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <script>
+        // Generate slide thumbnails
+        const slideGrid = document.getElementById('slideGrid');
+        const selectedSlides = new Set([2, 5, 7]);
+        
+        for (let i = 1; i <= 8; i++) {
+            const slide = document.createElement('div');
+            slide.className = 'slide-thumb' + (selectedSlides.has(i) ? ' selected' : '');
+            slide.innerHTML = `<div class="number">${i}</div>`;
+            slide.onclick = () => toggleSlide(slide, i);
+            slideGrid.appendChild(slide);
+        }
+        
+        function toggleSlide(element, num) {
+            element.classList.toggle('selected');
+            if (selectedSlides.has(num)) {
+                selectedSlides.delete(num);
+            } else {
+                selectedSlides.add(num);
+            }
+            updateSelectedBadge();
+        }
+        
+        function updateSelectedBadge() {
+            const badge = document.querySelector('.badge');
+            const selected = Array.from(selectedSlides).sort((a, b) => a - b);
+            badge.textContent = selected.length > 0 
+                ? `Selected: Slide ${selected.join(', ')}` 
+                : 'No slides selected';
+        }
+        
+        // Generate option cards
+        const options = [
+            { id: 1, title: 'Modern Design', rating: 5, changes: ['New layout', 'Added charts', 'Color scheme'], selected: true },
+            { id: 2, title: 'Minimalist', rating: 4, changes: ['Clean design', 'Less text', 'White space'], selected: false },
+            { id: 3, title: 'Infographic Style', rating: 5, changes: ['Visual icons', 'Data viz', 'Flow diagram'], selected: true },
+            { id: 4, title: 'Data-Focused', rating: 3, changes: ['Tables', 'Metrics', 'Analytics'], selected: false }
+        ];
+        
+        function generateOptions() {
+            const optionsGrid = document.getElementById('optionsGrid');
+            optionsGrid.innerHTML = '';
+            
+            options.forEach(opt => {
+                const card = document.createElement('div');
+                card.className = 'option-card' + (opt.selected ? ' selected' : '');
+                card.innerHTML = `
+                    <div class="option-header">
+                        <div class="option-title">Option ${opt.id}: ${opt.title}</div>
+                        <input type="checkbox" class="option-checkbox" ${opt.selected ? 'checked' : ''}>
+                    </div>
+                    <div class="option-preview">Preview Image</div>
+                    <div class="rating">${'⭐'.repeat(opt.rating)}${'☆'.repeat(5-opt.rating)}</div>
+                    <div class="option-changes">
+                        <strong>Changes:</strong>
+                        <ul>
+                            ${opt.changes.map(c => `<li>${c}</li>`).join('')}
+                        </ul>
+                    </div>
+                `;
+                
+                card.onclick = (e) => {
+                    if (e.target.type !== 'checkbox') {
+                        const checkbox = card.querySelector('.option-checkbox');
+                        checkbox.checked = !checkbox.checked;
+                    }
+                    card.classList.toggle('selected');
+                    opt.selected = !opt.selected;
+                    updateComparison();
+                };
+                
+                optionsGrid.appendChild(card);
+            });
+            
+            updateComparison();
+        }
+        
+        function updateComparison() {
+            const selected = options.filter(o => o.selected);
+            const comparisonView = document.getElementById('comparisonView');
+            
+            if (selected.length > 0) {
+                comparisonView.style.display = 'block';
+            } else {
+                comparisonView.style.display = 'none';
+            }
+        }
+        
+        function applyOptions() {
+            const selected = options.filter(o => o.selected);
+            alert(`Applying ${selected.length} selected options:\n${selected.map(o => `- Option ${o.id}: ${o.title}`).join('\n')}`);
+        }
+        
+        // Initialize
+        generateOptions();
+    </script>
+</body>
+</html>
+
